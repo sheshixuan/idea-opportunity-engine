@@ -175,6 +175,12 @@ class EvalHarnessTests(unittest.TestCase):
         )
         self.assertTrue(score_response(case, response)["passed"])
 
+    def test_discovery_cases_allow_killing_non_lead_candidates(self):
+        """A discovery must be able to reject a weak candidate while recommending a viable lead."""
+        cases = validate_cases(CASES)
+        self.assertIn("KILL", cases[1]["allowed_decisions"])
+        self.assertIn("KILL", cases[5]["allowed_decisions"])
+
     def test_common_unicode_hyphen_preserves_constraint_match(self):
         """Typography must not hide an otherwise explicit 30-day constraint from scoring."""
         case = validate_cases(CASES)[5]

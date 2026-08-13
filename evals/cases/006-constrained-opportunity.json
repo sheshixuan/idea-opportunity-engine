@@ -3,7 +3,7 @@
   "mode": "discovery",
   "prompt": "Find opportunities a two-person team can test in 30 days with a $2,000 budget.",
   "should_trigger": true,
-  "allowed_decisions": ["TEST", "WATCH"],
+  "allowed_decisions": ["TEST", "WATCH", "KILL"],
   "required_behavior_groups": [["verdict:"], ["two-person", "small team"], ["30 days", "30-day"], ["$2,000", "2000"], ["experiment"], ["cost", "budget"], ["threshold"]],
   "forbidden_phrases": ["build a full platform first"],
   "semantic_judge_notes": "Check that the recommendation respects the stated time and cash constraints."
