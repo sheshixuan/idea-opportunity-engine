@@ -137,6 +137,27 @@ class EvalHarnessTests(unittest.TestCase):
         )
         self.assertTrue(score_response(case, response)["passed"])
 
+    def test_validation_accepts_matching_decision_card_table_score(self):
+        """The real 004 decision-card table must expose its sole adjusted score to the mapping gate."""
+        case = validate_cases(CASES)[3]
+        response = (
+            "Verdict: KILL — retention and payer evidence are weak. Retention is low. "
+            "Alternatives and payer evidence are explicit.\n"
+            "| Field | Assessment |\n| --- | --- |\n| Adjusted score | 0/100 |\n"
+            "Experiment: run a payment test with a decision rule."
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
+    def test_plural_switching_costs_satisfies_alternative_analysis(self):
+        """The real 007 wording must not fail only because it uses the natural plural form."""
+        case = validate_cases(CASES)[6]
+        response = (
+            "Verdict: KILL — evidence is weak. Adjusted score: 41/100. Alternatives include spreadsheets, "
+            "phone calls, manual work, and doing nothing. Existing suites raise switching and integration costs. "
+            "Experiment: run a paid pilot."
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
     def test_discovery_accepts_one_valid_decision_per_candidate(self):
         """Rejecting multi-candidate discovery or losing candidate decisions must fail this contract."""
         case = validate_cases(CASES)[1]
@@ -378,6 +399,9 @@ class EvalHarnessTests(unittest.TestCase):
 
         boundary_response = "SELECT plan_tier, COUNT(DISTINCT user_id) FROM events GROUP BY plan_tier;"
         self.assertTrue(score_response(case, boundary_response)["passed"])
+
+        scoped_decline = "This is outside the Idea Opportunity Engine scope; it is not an opportunity analysis."
+        self.assertTrue(score_response(case, scoped_decline)["passed"])
 
     def test_sql_boundary_rejects_unlabeled_analysis_with_boundary_language(self):
         """Removing broad analysis markers would let this disguised opportunity analysis pass."""

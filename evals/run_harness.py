@@ -162,6 +162,21 @@ def _parse_score(value):
     return int(match.group(1)) if match else None
 
 
+def _validation_scores(text):
+    """Return adjusted scores from labeled prose or exact decision-card table rows."""
+    scores = [int(match.group("score")) for match in ADJUSTED_SCORE.finditer(text)]
+    for line in text.splitlines():
+        if "|" not in line:
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) < 2 or _plain_name(cells[0]) != "adjusted score":
+            continue
+        score = _parse_score(cells[1])
+        if score is not None:
+            scores.append(score)
+    return scores
+
+
 def _plain_name(value):
     return " ".join(re.sub(r"[\*`_]", "", value).strip().lower().split())
 
@@ -191,12 +206,12 @@ def score_response(case, text):
         elif case["mode"] == "validation" and len(matches) != 1:
             failures.append("response must state exactly one labeled decision")
         elif case["mode"] == "validation":
-            scores = list(ADJUSTED_SCORE.finditer(text))
+            scores = _validation_scores(text)
             if len(scores) != 1:
                 failures.append("validation response must state exactly one adjusted score")
             else:
                 failure = _score_decision_failure(
-                    int(scores[0].group("score")), decisions[0], "validation verdict"
+                    scores[0], decisions[0], "validation verdict"
                 )
                 if failure:
                     failures.append(failure)
