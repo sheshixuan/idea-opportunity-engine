@@ -39,6 +39,15 @@ class SecurityScanTests(unittest.TestCase):
             readme.write_text("Contact: hello" + "@example.com")
             self.assertEqual([], scan_paths([readme], root))
 
+    def test_non_utf8_file_is_reported_as_unscannable(self):
+        """Silently skipping undecodable tracked content would leave a privacy blind spot."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            opaque = root / "opaque.bin"
+            opaque.write_bytes(b"\xff\xfe\x00private")
+            issues = scan_paths([opaque], root)
+            self.assertTrue(any("could not scan as UTF-8 text" in issue for issue in issues), issues)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -29,14 +29,17 @@ def scan_paths(paths, root):
     for path in paths:
         path = Path(path)
         try:
-            content = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            continue
-        try:
             relative = path.resolve().relative_to(root)
         except ValueError:
             relative = path
         display = relative.as_posix()
+        try:
+            content = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            issues.append(f"{display}: could not scan as UTF-8 text")
+            continue
+        except OSError:
+            continue
         if any(pattern.search(content) for pattern in CREDENTIAL_PATTERNS):
             issues.append(f"{display}: credential-like value detected")
         if PRIVATE_KEY.search(content):
