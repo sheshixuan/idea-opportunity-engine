@@ -11,6 +11,7 @@ from pathlib import Path
 SKILL_NAME = "idea-opportunity-engine"
 PLUGIN_VERSION = "0.1.0"
 PUBLIC_TARGET = "https://github.com/sheshixuan/idea-opportunity-engine"
+PUBLIC_GIT_TARGET = f"{PUBLIC_TARGET}.git"
 REFERENCE_FILES = {
     "evidence-policy.md",
     "experiment-framework.md",
@@ -88,7 +89,7 @@ def validate_repository(root):
             entries = marketplace.get("plugins") if isinstance(marketplace, dict) else None
             expected_entry = {
                 "name": SKILL_NAME,
-                "source": {"source": "local", "path": "./"},
+                "source": {"source": "url", "url": PUBLIC_GIT_TARGET, "ref": "main"},
             }
             if not isinstance(entries, list) or not any(
                 isinstance(entry, dict)
@@ -96,7 +97,7 @@ def validate_repository(root):
                 and entry.get("source") == expected_entry["source"]
                 for entry in entries
             ):
-                errors.append("marketplace manifest must expose idea-opportunity-engine at './'")
+                errors.append("marketplace manifest must expose idea-opportunity-engine from its published Git URL on main")
 
     skill_path = root / "skills" / SKILL_NAME / "SKILL.md"
     if skill_path.is_file():

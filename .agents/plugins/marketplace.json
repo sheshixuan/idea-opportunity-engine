@@ -7,8 +7,9 @@
     {
       "name": "idea-opportunity-engine",
       "source": {
-        "source": "local",
-        "path": "./"
+        "source": "url",
+        "url": "https://github.com/sheshixuan/idea-opportunity-engine.git",
+        "ref": "main"
       },
       "policy": {
         "installation": "AVAILABLE",

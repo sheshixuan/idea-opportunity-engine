@@ -36,7 +36,14 @@ class RepositoryValidationTests(unittest.TestCase):
             json.dumps(
                 {
                     "plugins": [
-                        {"name": "idea-opportunity-engine", "source": {"source": "local", "path": "./"}}
+                        {
+                            "name": "idea-opportunity-engine",
+                            "source": {
+                                "source": "url",
+                                "url": "https://github.com/sheshixuan/idea-opportunity-engine.git",
+                                "ref": "main",
+                            },
+                        }
                     ]
                 }
             )
@@ -73,6 +80,17 @@ class RepositoryValidationTests(unittest.TestCase):
             (Path(temporary) / ".agents" / "plugins" / "marketplace.json").write_text("{}")
             errors = validate_repository(Path(temporary))
             self.assertTrue(any("marketplace" in error for error in errors), errors)
+
+    def test_local_root_marketplace_source_is_reported(self):
+        """A local root source may list locally but must not ship as a public Git marketplace entry."""
+        with tempfile.TemporaryDirectory() as temporary:
+            self.make_valid_tree(temporary)
+            marketplace_path = Path(temporary) / ".agents" / "plugins" / "marketplace.json"
+            marketplace = json.loads(marketplace_path.read_text())
+            marketplace["plugins"][0]["source"] = {"source": "local", "path": "./"}
+            marketplace_path.write_text(json.dumps(marketplace))
+            errors = validate_repository(Path(temporary))
+            self.assertTrue(any("published Git URL" in error for error in errors), errors)
 
     def test_complete_valid_tree_has_no_errors(self):
         """Adding a valid package requirement must keep this full synthetic tree valid."""
