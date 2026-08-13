@@ -89,6 +89,24 @@ class RepositoryValidationTests(unittest.TestCase):
             errors = validate_repository(Path(temporary))
             self.assertTrue(any("reference files" in error for error in errors), errors)
 
+    def test_extra_non_markdown_reference_is_reported(self):
+        """Ignoring an extra text resource would violate the exact reference-directory contract."""
+        with tempfile.TemporaryDirectory() as temporary:
+            self.make_valid_tree(temporary)
+            references = Path(temporary) / "skills" / "idea-opportunity-engine" / "references"
+            (references / "extra.txt").write_text("unapproved")
+            errors = validate_repository(Path(temporary))
+            self.assertTrue(any("reference directory" in error for error in errors), errors)
+
+    def test_extra_reference_subdirectory_is_reported(self):
+        """Allowing a nested reference directory would weaken the exact package boundary."""
+        with tempfile.TemporaryDirectory() as temporary:
+            self.make_valid_tree(temporary)
+            references = Path(temporary) / "skills" / "idea-opportunity-engine" / "references"
+            (references / "nested").mkdir()
+            errors = validate_repository(Path(temporary))
+            self.assertTrue(any("reference directory" in error for error in errors), errors)
+
     def test_plugin_metadata_mutations_are_reported(self):
         """Changing version, license, homepage, or repository must each break package validation."""
         for field, value in (

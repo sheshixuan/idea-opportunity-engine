@@ -27,6 +27,9 @@ SEMANTIC_ANALYSIS_MARKERS = (
     "decision card",
     "adjusted score",
     "100-point",
+    "target user",
+    "alternatives",
+    "experiment",
 )
 
 
@@ -98,6 +101,31 @@ def validate_cases(case_dir):
     return sorted(cases, key=lambda case: case["id"])
 
 
+def _decision_table_values(text):
+    """Return decision cells from a Markdown candidate table, or None when no table exists."""
+    lines = text.splitlines()
+    for index, line in enumerate(lines[:-1]):
+        if "|" not in line:
+            continue
+        header = [cell.strip().lower() for cell in line.strip().strip("|").split("|")]
+        if "decision" not in header:
+            continue
+        divider = [cell.strip() for cell in lines[index + 1].strip().strip("|").split("|")]
+        if len(divider) != len(header) or not all(re.fullmatch(r":?-{3,}:?", cell) for cell in divider):
+            continue
+        decision_index = header.index("decision")
+        values = []
+        for row in lines[index + 2 :]:
+            if "|" not in row:
+                break
+            cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
+            if len(cells) != len(header):
+                break
+            values.append(cells[decision_index])
+        return values
+    return None
+
+
 def score_response(case, text):
     """Score only observable response rules; semantic quality still needs a human/LLM judge."""
     normalized = text.lower()
@@ -117,7 +145,10 @@ def score_response(case, text):
             failures.append("response must state exactly one labeled decision")
         elif case["mode"] in {"discovery", "portfolio"}:
             headings = list(CANDIDATE_HEADING.finditer(text))
+            table_values = _decision_table_values(text)
             if headings:
+                if table_values is not None:
+                    failures.append("response must use either candidate headings or a candidate decision table")
                 candidate_match_ranges = []
                 for index, heading in enumerate(headings):
                     end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
@@ -130,6 +161,21 @@ def score_response(case, text):
                     if match.group("label").lower() == "decision" and not in_candidate:
                         failures.append("candidate decisions must appear under a candidate heading")
                         break
+            elif table_values is not None:
+                if not table_values:
+                    failures.append("candidate decision table must contain at least one candidate row")
+                for value in table_values:
+                    decision = re.fullmatch(r"\s*(GO|TEST|WATCH|KILL)\s*", value, re.IGNORECASE)
+                    if not decision:
+                        failures.append("each candidate decision table row must contain exactly one decision")
+                        break
+                    if decision.group(1).upper() not in case["allowed_decisions"]:
+                        failures.append("response decision is not allowed for this case")
+                        break
+                if any(match.group("label").lower() == "decision" for match in matches):
+                    failures.append("candidate decisions must use the decision table cells")
+            elif len(matches) != 1 or matches[0].group("label").lower() != "verdict":
+                failures.append("unstructured discovery or portfolio responses may state only one overall verdict")
     for group in case["required_behavior_groups"]:
         if not any(phrase.lower() in normalized for phrase in group):
             failures.append(f"missing required behavior group: {' | '.join(group)}")

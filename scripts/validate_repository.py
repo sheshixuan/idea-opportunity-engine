@@ -107,13 +107,10 @@ def validate_repository(root):
             errors.append(f"skill name {skill_name!r} does not match plugin name {SKILL_NAME!r}")
     references_path = root / "skills" / SKILL_NAME / "references"
     if references_path.is_dir():
-        actual_references = {
-            path.relative_to(references_path).as_posix()
-            for path in references_path.rglob("*.md")
-            if path.is_file()
-        }
-        if actual_references != REFERENCE_FILES:
-            errors.append("reference files must be exactly the four approved Markdown references")
+        entries = list(references_path.iterdir())
+        actual_references = {entry.name for entry in entries if entry.is_file()}
+        if actual_references != REFERENCE_FILES or any(not entry.is_file() for entry in entries):
+            errors.append("reference directory must contain exactly the four approved Markdown reference files")
     return errors
 
 

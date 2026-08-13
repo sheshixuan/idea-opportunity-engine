@@ -129,6 +129,44 @@ class EvalHarnessTests(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertTrue(any("candidate" in failure for failure in result["failures"]))
 
+    def test_discovery_rejects_unstructured_conflicting_decisions(self):
+        """Ambiguous candidate prose without headings or a table must not hide conflicting labels."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer. Candidate A: Decision: TEST. Decision: WATCH."
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("unstructured" in failure for failure in result["failures"]))
+
+    def test_discovery_accepts_one_decision_per_candidate_table_row(self):
+        """Breaking decision-table parsing must reject this two-candidate discovery response."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "**Verdict:** TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer.\n"
+            "| Opportunity | Decision |\n| --- | --- |\n"
+            "| remediation audit | TEST |\n| training service | WATCH |"
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
+    def test_discovery_rejects_conflicting_decision_table_row(self):
+        """A table row with two decision cells must fail instead of being treated as one candidate decision."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer.\n"
+            "| Opportunity | Decision |\n| --- | --- |\n"
+            "| remediation audit | TEST / WATCH |"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("table row" in failure for failure in result["failures"]))
+
     def test_sql_boundary_rejects_opportunity_analysis(self):
         """Giving a SQL request a GO/TEST/WATCH/KILL analysis must fail the boundary case."""
         case = validate_cases(CASES)[-1]
@@ -150,6 +188,15 @@ class EvalHarnessTests(unittest.TestCase):
         result = score_response(case, response)
         self.assertFalse(result["passed"])
         self.assertTrue(any("must not trigger" in failure for failure in result["failures"]))
+
+    def test_sql_boundary_rejects_unlabeled_target_user_analysis(self):
+        """Missing common report markers would let this boundary-disguised analysis pass."""
+        case = validate_cases(CASES)[-1]
+        response = (
+            "This is outside the opportunity-analysis boundary, but the target user is finance, "
+            "alternatives are spreadsheets, and the experiment is a concierge test."
+        )
+        self.assertFalse(score_response(case, response)["passed"])
 
 
 if __name__ == "__main__":
