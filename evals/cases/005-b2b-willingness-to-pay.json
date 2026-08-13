@@ -1,0 +1,10 @@
+{
+  "id": "005",
+  "mode": "validation",
+  "prompt": "Evaluate a B2B compliance dashboard where users like the demo but procurement has not engaged.",
+  "should_trigger": true,
+  "allowed_decisions": ["TEST", "WATCH", "KILL"],
+  "required_behavior_groups": [["verdict:"], ["economic buyer", "procurement"], ["budget", "payment"], ["willingness to pay"], ["alternatives"], ["experiment", "paid pilot"]],
+  "forbidden_phrases": ["demo enthusiasm is revenue"],
+  "semantic_judge_notes": "Check for an explicit economic buyer and a payment or commitment test."
+}

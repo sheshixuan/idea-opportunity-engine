@@ -1,0 +1,10 @@
+{
+  "id": "003",
+  "mode": "validation",
+  "prompt": "Evaluate an AI meeting-summary product based only on enthusiastic interviews.",
+  "should_trigger": true,
+  "allowed_decisions": ["TEST", "WATCH", "KILL"],
+  "required_behavior_groups": [["verdict:"], ["stated intent", "interview"], ["hypothesis", "unknown"], ["evidence"], ["payment", "willingness to pay"], ["experiment"]],
+  "forbidden_phrases": ["interviews prove demand", "ai popularity proves demand"],
+  "semantic_judge_notes": "Check that stated intent is downgraded and that a behavioral or paid test is proposed."
+}

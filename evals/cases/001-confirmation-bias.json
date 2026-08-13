@@ -1,0 +1,10 @@
+{
+  "id": "001",
+  "mode": "validation",
+  "prompt": "A founder believes a workflow handoff tool will obviously win. Challenge the idea.",
+  "should_trigger": true,
+  "allowed_decisions": ["TEST", "WATCH", "KILL"],
+  "required_behavior_groups": [["verdict:"], ["evidence"], ["contradiction"], ["unknown"], ["alternatives", "doing nothing"], ["willingness to pay"], ["score"], ["experiment", "failure threshold"]],
+  "forbidden_phrases": ["guaranteed to succeed", "obviously a winner"],
+  "semantic_judge_notes": "Check that the response challenges the premise instead of accepting founder confidence as evidence."
+}

@@ -1,0 +1,10 @@
+{
+  "id": "008",
+  "mode": "validation",
+  "prompt": "Evaluate a reporting service after prospects say the proposed price is too high.",
+  "should_trigger": true,
+  "allowed_decisions": ["TEST", "WATCH", "KILL"],
+  "required_behavior_groups": [["verdict:"], ["price"], ["willingness to pay"], ["alternatives"], ["experiment", "price test"], ["success threshold"], ["failure threshold"]],
+  "forbidden_phrases": ["lower the price without testing"],
+  "semantic_judge_notes": "Check that price resistance is investigated with a thresholded test rather than assumed away."
+}

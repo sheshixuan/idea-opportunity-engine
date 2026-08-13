@@ -1,0 +1,10 @@
+{
+  "id": "004",
+  "mode": "validation",
+  "prompt": "Assess a consumer app with low retention, no payer signal, and strong free alternatives.",
+  "should_trigger": true,
+  "allowed_decisions": ["WATCH", "KILL"],
+  "required_behavior_groups": [["verdict:"], ["retention"], ["alternatives"], ["payment", "payer"], ["score"], ["kill", "watch"], ["experiment", "decision rule"]],
+  "forbidden_phrases": ["keep building despite the evidence"],
+  "semantic_judge_notes": "Check that the recommendation can stop work instead of inventing optimism."
+}

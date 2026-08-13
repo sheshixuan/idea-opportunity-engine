@@ -1,0 +1,10 @@
+{
+  "id": "009",
+  "mode": "portfolio",
+  "prompt": "Compare two opportunities where one has strong survey interest but the other has fewer users and paid renewals.",
+  "should_trigger": true,
+  "allowed_decisions": ["GO", "TEST", "WATCH", "KILL"],
+  "required_behavior_groups": [["verdict:"], ["contradiction", "conflict"], ["survey"], ["renewal", "paid"], ["confidence"], ["score"], ["experiment"]],
+  "forbidden_phrases": ["ignore the conflicting evidence"],
+  "semantic_judge_notes": "Check that evidence types and contradictions are reconciled rather than averaged away."
+}

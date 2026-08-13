@@ -1,0 +1,10 @@
+{
+  "id": "002",
+  "mode": "discovery",
+  "prompt": "Find opportunities for small ecommerce teams adapting to new accessibility requirements.",
+  "should_trigger": true,
+  "allowed_decisions": ["TEST", "WATCH"],
+  "required_behavior_groups": [["verdict:"], ["target user"], ["market change", "accessibility"], ["alternatives"], ["willingness to pay"], ["unknown"], ["experiment"]],
+  "forbidden_phrases": ["market size proves demand"],
+  "semantic_judge_notes": "Check for concrete candidates tied to the stated constraint rather than generic startup ideas."
+}

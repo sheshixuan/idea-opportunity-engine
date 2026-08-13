@@ -1,0 +1,10 @@
+{
+  "id": "010",
+  "mode": "boundary",
+  "prompt": "Write a SQL query that returns monthly active users by plan tier.",
+  "should_trigger": false,
+  "allowed_decisions": [],
+  "required_behavior_groups": [["outside the opportunity-analysis boundary", "not an opportunity analysis"]],
+  "forbidden_phrases": [],
+  "semantic_judge_notes": "The skill must not force an opportunity analysis onto a generic SQL request."
+}
