@@ -167,6 +167,53 @@ class EvalHarnessTests(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertTrue(any("table row" in failure for failure in result["failures"]))
 
+    def test_discovery_rejects_multiple_verdicts_with_candidate_headings(self):
+        """A second overall Verdict in a heading response must not be mistaken for a candidate decision."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer.\n## Candidate A\nDecision: TEST\nVerdict: WATCH"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("overall verdict" in failure for failure in result["failures"]))
+
+    def test_discovery_rejects_multiple_verdicts_with_candidate_table(self):
+        """A table must not allow a contradictory second lead Verdict after its rows."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer.\n| Opportunity | Decision |\n| --- | --- |\n"
+            "| remediation audit | TEST |\nVerdict: WATCH"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("overall verdict" in failure for failure in result["failures"]))
+
+    def test_discovery_requires_lead_verdict_before_candidate_decisions(self):
+        """A Verdict after candidate labels violates the verdict-first report contract."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Target user: small ecommerce teams. Accessibility is the market change. "
+            "Alternatives and willingness to pay are unknown. Experiment: test a paid offer.\n"
+            "## Candidate A\nDecision: TEST\nVerdict: TEST the accessibility lead."
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("first labeled decision" in failure for failure in result["failures"]))
+
+    def test_discovery_accepts_lead_first_unstructured_verdict(self):
+        """A single lead-first Verdict remains valid when no candidate structure is used."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer."
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
     def test_sql_boundary_rejects_opportunity_analysis(self):
         """Giving a SQL request a GO/TEST/WATCH/KILL analysis must fail the boundary case."""
         case = validate_cases(CASES)[-1]

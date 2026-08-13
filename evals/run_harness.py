@@ -101,17 +101,21 @@ def validate_cases(case_dir):
     return sorted(cases, key=lambda case: case["id"])
 
 
-def _decision_table_values(text):
-    """Return decision cells from a Markdown candidate table, or None when no table exists."""
+def _decision_table(text):
+    """Return decision cells and table offset from Markdown candidate table, or None."""
     lines = text.splitlines()
+    offset = 0
     for index, line in enumerate(lines[:-1]):
         if "|" not in line:
+            offset += len(line) + 1
             continue
         header = [cell.strip().lower() for cell in line.strip().strip("|").split("|")]
         if "decision" not in header:
+            offset += len(line) + 1
             continue
         divider = [cell.strip() for cell in lines[index + 1].strip().strip("|").split("|")]
         if len(divider) != len(header) or not all(re.fullmatch(r":?-{3,}:?", cell) for cell in divider):
+            offset += len(line) + 1
             continue
         decision_index = header.index("decision")
         values = []
@@ -122,7 +126,7 @@ def _decision_table_values(text):
             if len(cells) != len(header):
                 break
             values.append(cells[decision_index])
-        return values
+        return values, offset
     return None
 
 
@@ -145,7 +149,13 @@ def score_response(case, text):
             failures.append("response must state exactly one labeled decision")
         elif case["mode"] in {"discovery", "portfolio"}:
             headings = list(CANDIDATE_HEADING.finditer(text))
-            table_values = _decision_table_values(text)
+            table = _decision_table(text)
+            table_values = table[0] if table is not None else None
+            verdicts = [match for match in matches if match.group("label").lower() == "verdict"]
+            if len(verdicts) != 1:
+                failures.append("response must state exactly one overall verdict")
+            elif matches[0] is not verdicts[0]:
+                failures.append("overall verdict must be the first labeled decision")
             if headings:
                 if table_values is not None:
                     failures.append("response must use either candidate headings or a candidate decision table")
@@ -161,7 +171,11 @@ def score_response(case, text):
                     if match.group("label").lower() == "decision" and not in_candidate:
                         failures.append("candidate decisions must appear under a candidate heading")
                         break
+                if verdicts and verdicts[0].start() >= headings[0].start():
+                    failures.append("candidate sections must not contain a Verdict label")
             elif table_values is not None:
+                if verdicts and verdicts[0].start() >= table[1]:
+                    failures.append("overall verdict must appear before the candidate decision table")
                 if not table_values:
                     failures.append("candidate decision table must contain at least one candidate row")
                 for value in table_values:
