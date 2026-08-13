@@ -112,18 +112,21 @@ def validate_cases(case_dir):
     return sorted(cases, key=lambda case: case["id"])
 
 
-def _candidate_table(text):
-    """Return structured candidate rows and table offset, or None."""
-    lines = text.splitlines()
+def _candidate_tables(text):
+    """Return every structured candidate table in document order."""
+    lines = text.splitlines(keepends=True)
+    offsets = []
     offset = 0
+    for line in lines:
+        offsets.append(offset)
+        offset += len(line)
+    tables = []
     for index, line in enumerate(lines[:-1]):
         if "|" not in line:
-            offset += len(line) + 1
             continue
         header = [cell.strip().lower() for cell in line.strip().strip("|").split("|")]
         name_header = next((name for name in ("candidate", "opportunity") if name in header), None)
         if name_header is None or "adjusted score" not in header or "decision" not in header:
-            offset += len(line) + 1
             continue
         divider = [cell.strip() for cell in lines[index + 1].strip().strip("|").split("|")]
         if len(divider) != len(header) or not all(re.fullmatch(r":?-{3,}:?", cell) for cell in divider):
@@ -136,15 +139,12 @@ def _candidate_table(text):
             cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
             if len(cells) != len(header):
                 break
-            rows.append(
-                {
-                    "name": cells[header.index(name_header)],
-                    "score": cells[header.index("adjusted score")],
-                    "decision": cells[header.index("decision")],
-                }
-            )
-        return rows, offset
-    return None
+            values = dict(zip(header, cells))
+            values["name"] = values[name_header]
+            values["score"] = values["adjusted score"]
+            rows.append(values)
+        tables.append((rows, offsets[index]))
+    return tables
 
 
 def _expected_decision(score):
@@ -188,6 +188,44 @@ def _score_decision_failure(score, decision, subject):
     return None
 
 
+def _has_positive_signal(value, terms):
+    plain = _plain_name(value)
+    if any(
+        marker in plain
+        for marker in (
+            "none",
+            "unknown",
+            "unproven",
+            "absent",
+            "not verified",
+            "not proven",
+            "no payment",
+            "no paid",
+            "no budget",
+            "no commitment",
+        )
+    ):
+        return False
+    return any(re.search(rf"\b{term}\w*\b", plain) for term in terms)
+
+
+def _go_gate_failure(decision, subject, confidence, payment, evidence):
+    """Enforce the observable high-confidence, evidence, and payment gate for GO."""
+    if decision != "GO":
+        return None
+    high_confidence = re.search(r"\bhigh\b", _plain_name(confidence or "")) is not None
+    payment_signal = _has_positive_signal(
+        payment or "", ("paid", "payment", "renew", "deposit", "purchase", "contract", "invoice", "revenue", "budget")
+    )
+    evidence_signal = _has_positive_signal(
+        " ".join((evidence or "", payment or "")),
+        ("behavior", "operation", "usage", "retention", "renew", "transaction", "record", "observed"),
+    )
+    if not (high_confidence and payment_signal and evidence_signal):
+        return f"{subject} GO gate requires high confidence, behavioral or operational evidence, and a payment signal"
+    return None
+
+
 def score_response(case, text):
     """Score only observable response rules; semantic quality still needs a human/LLM judge."""
     normalized = text.lower().translate(str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-"}))
@@ -217,7 +255,8 @@ def score_response(case, text):
                     failures.append(failure)
         elif case["mode"] in {"discovery", "portfolio"}:
             headings = list(CANDIDATE_HEADING.finditer(text))
-            table = _candidate_table(text)
+            tables = _candidate_tables(text)
+            table = tables[0] if tables else None
             table_rows = table[0] if table is not None else None
             verdicts = [match for match in matches if match.group("label").lower() == "verdict"]
             lead_match = LEAD_VERDICT.match(text)
@@ -231,7 +270,7 @@ def score_response(case, text):
             lead_decision = lead_match.group("decision").upper() if lead_match else None
             candidates = []
             if headings:
-                if table_rows is not None:
+                if tables:
                     failures.append("response must use either candidate headings or a candidate decision table")
                 candidate_match_ranges = []
                 for index, heading in enumerate(headings):
@@ -250,6 +289,19 @@ def score_response(case, text):
                         failure = _score_decision_failure(score, decision, f"candidate {heading.group('name')}")
                         if failure:
                             failures.append(failure)
+                        section = text[heading.end() : end]
+                        confidence = re.search(r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?confidence(?:\*\*)?\s*:\s*(.+)$", section)
+                        payment = re.search(r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?(?:payment evidence|willingness to pay)(?:\*\*)?\s*:\s*(.+)$", section)
+                        evidence = re.search(r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?evidence(?:\*\*)?\s*:\s*(.+)$", section)
+                        gate_failure = _go_gate_failure(
+                            decision,
+                            f"candidate {heading.group('name')}",
+                            confidence.group(1) if confidence else "",
+                            payment.group(1) if payment else "",
+                            evidence.group(1) if evidence else "",
+                        )
+                        if gate_failure:
+                            failures.append(gate_failure)
                 for match in matches:
                     in_candidate = any(start <= match.start() < end for start, end in candidate_match_ranges)
                     if match.group("label").lower() == "decision" and not in_candidate:
@@ -258,6 +310,8 @@ def score_response(case, text):
                 if verdicts and verdicts[0].start() >= headings[0].start():
                     failures.append("candidate sections must not contain a Verdict label")
             elif table_rows is not None:
+                if len(tables) != 1:
+                    failures.append("response must contain exactly one candidate decision table")
                 if verdicts and verdicts[0].start() >= table[1]:
                     failures.append("overall verdict must appear before the candidate decision table")
                 if not table_rows:
@@ -278,6 +332,15 @@ def score_response(case, text):
                     failure = _score_decision_failure(score, decision_value, f"candidate {row['name']}")
                     if failure:
                         failures.append(failure)
+                    gate_failure = _go_gate_failure(
+                        decision_value,
+                        f"candidate {row['name']}",
+                        row.get("confidence", ""),
+                        row.get("payment evidence", row.get("willingness to pay", "")),
+                        row.get("evidence", ""),
+                    )
+                    if gate_failure:
+                        failures.append(gate_failure)
                 if any(match.group("label").lower() == "decision" for match in matches):
                     failures.append("candidate decisions must use the decision table cells")
             else:

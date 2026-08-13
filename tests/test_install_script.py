@@ -168,6 +168,34 @@ class InstallScriptTests(unittest.TestCase):
             self.assertNotIn("Recovery copy retained", result.stderr)
             self.assertEqual([], list(destination.glob(".idea-opportunity-engine-install.*")))
 
+    def test_interrupt_during_fresh_install_does_not_claim_update_or_retain_staging(self):
+        """A fresh-install signal must not invent an update recovery state."""
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "skills"
+            fake_bin = Path(temporary) / "fake-bin"
+            fake_bin.mkdir()
+            fake_cp = fake_bin / "cp"
+            fake_cp.write_text(
+                "#!/bin/sh\n"
+                "/bin/cp \"$@\"\n"
+                "kill -TERM \"$PPID\"\n"
+            )
+            fake_cp.chmod(0o755)
+            environment = os.environ.copy()
+            environment["PATH"] = f"{fake_bin}:{environment['PATH']}"
+            result = subprocess.run(
+                [str(INSTALLER), "install", "--dest", str(destination)],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("Install interrupted", result.stderr)
+            self.assertNotIn("Update interrupted", result.stderr)
+            self.assertEqual([], list(destination.glob(".idea-opportunity-engine-install.*")))
+
     def test_failed_staged_install_and_removal_failure_preserve_backup(self):
         """An rm failure after backup movement must not let EXIT cleanup destroy recovery."""
         with tempfile.TemporaryDirectory() as temporary:

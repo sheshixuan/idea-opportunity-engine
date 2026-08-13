@@ -279,6 +279,50 @@ class EvalHarnessTests(unittest.TestCase):
         )
         self.assertTrue(score_response(case, response)["passed"])
 
+    def test_portfolio_rejects_go_without_high_confidence_and_payment_gate(self):
+        """A numeric GO must also satisfy the documented evidence gate."""
+        case = validate_cases(CASES)[8]
+        response = (
+            "Verdict: GO — Portfolio lead: Renewal Opportunity. Confidence: low. "
+            "Survey interest conflicts with the paid-renewal claim, and an experiment follows.\n"
+            "| Opportunity | Adjusted score | Confidence | Payment evidence | Evidence | Decision |\n"
+            "| --- | ---: | --- | --- | --- | --- |\n"
+            "| Renewal Opportunity | 95/100 | Low | None verified | Narrative only | GO |"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("GO gate" in failure for failure in result["failures"]), result["failures"])
+
+    def test_portfolio_accepts_go_with_high_confidence_and_payment_gate(self):
+        """High-confidence behavioral evidence plus payment may support a numeric GO."""
+        case = validate_cases(CASES)[8]
+        response = (
+            "Verdict: GO — Portfolio lead: Renewal Opportunity. Confidence: high. "
+            "Survey interest conflicts with observed renewal behavior; the next experiment tests scale.\n"
+            "| Opportunity | Adjusted score | Confidence | Payment evidence | Key risk | Decision |\n"
+            "| --- | ---: | --- | --- | --- | --- |\n"
+            "| Renewal Opportunity | 95/100 | High | Five customers paid and renewed | Sample size | GO |"
+        )
+        result = score_response(case, response)
+        self.assertTrue(result["passed"], result["failures"])
+
+    def test_portfolio_rejects_a_second_candidate_table(self):
+        """Every evaluated candidate must be covered by one unambiguous table contract."""
+        case = validate_cases(CASES)[8]
+        response = (
+            "Verdict: TEST — Portfolio lead: Renewal Opportunity. Confidence: medium. "
+            "Survey interest conflicts with paid renewals; the experiment tests retention.\n"
+            "| Opportunity | Adjusted score | Decision |\n"
+            "| --- | ---: | --- |\n"
+            "| Renewal Opportunity | 75/100 | TEST |\n\n"
+            "| Candidate | Adjusted score | Decision |\n"
+            "| --- | ---: | --- |\n"
+            "| Survey Opportunity | 0/100 | TEST |"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("exactly one candidate decision table" in failure for failure in result["failures"]), result["failures"])
+
     def test_portfolio_rejects_heading_candidate_score_decision_mismatch(self):
         """A heading candidate cannot label a 45/100 adjusted score as TEST."""
         case = validate_cases(CASES)[8]

@@ -101,6 +101,14 @@ stage_and_install() {
   }
   interrupted() {
     trap - HUP INT TERM
+    if [ "$action" = "install" ]; then
+      if [ -e "$skill_dest" ]; then
+        echo "Install interrupted after placement; installed copy remains at: $skill_dest" >&2
+      else
+        echo "Install interrupted before placement; no existing install was changed." >&2
+      fi
+      exit 128
+    fi
     if [ "$backup_moved" -eq 1 ] && [ -e "${backup_skill:-}" ]; then
       preserve_recovery
       exit 128
