@@ -265,6 +265,20 @@ class EvalHarnessTests(unittest.TestCase):
         )
         self.assertTrue(score_response(case, response)["passed"])
 
+    def test_portfolio_accepts_explicit_evidence_type_contrast(self):
+        """Case 009 may reconcile conflicting signals without using the literal word conflict."""
+        case = validate_cases(CASES)[8]
+        response = (
+            "Verdict: TEST — Portfolio lead: Paid-Renewal Opportunity. Confidence: medium. "
+            "Paid renewals are direct behavioral evidence of continuing value, while survey interest "
+            "is stated intent and not evidence of demand. The ranking would change if survey respondents "
+            "make paid commitments. Experiment: run a paid pilot.\n"
+            "| Opportunity | Adjusted score | Decision |\n| --- | ---: | --- |\n"
+            "| Paid-Renewal Opportunity | 71/100 | TEST |\n"
+            "| Survey-Interest Opportunity | 28/100 | KILL |"
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
     def test_portfolio_rejects_heading_candidate_score_decision_mismatch(self):
         """A heading candidate cannot label a 45/100 adjusted score as TEST."""
         case = validate_cases(CASES)[8]
