@@ -153,6 +153,48 @@ class EvalHarnessTests(unittest.TestCase):
         )
         self.assertTrue(score_response(case, response)["passed"])
 
+    def test_discovery_rejects_decision_label_before_candidate_table(self):
+        """An overall Decision before a valid table must not supplement the lead Verdict."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: TEST the accessibility lead.\nDecision: WATCH\n"
+            "Target user: small ecommerce teams. Accessibility is the market change. "
+            "Alternatives and willingness to pay are unknown. Experiment: test a paid offer.\n"
+            "| Opportunity | Decision |\n| --- | --- |\n"
+            "| remediation audit | TEST |\n| training service | WATCH |"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("decision table cells" in failure for failure in result["failures"]))
+
+    def test_portfolio_rejects_decision_label_after_candidate_table(self):
+        """An overall Decision after a valid table must not add another labeled decision."""
+        case = validate_cases(CASES)[8]
+        response = (
+            "Verdict: TEST the renewal-backed opportunity. Conflicting survey evidence is weaker "
+            "than paid renewal behavior. Confidence: medium. Score: 72. Experiment: expand the paid pilot.\n"
+            "| Opportunity | Decision |\n| --- | --- |\n"
+            "| survey-backed concept | WATCH |\n| renewal-backed concept | TEST |\n"
+            "Decision: WATCH"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("decision table cells" in failure for failure in result["failures"]))
+
+    def test_discovery_rejects_verdict_inside_candidate_table(self):
+        """A Verdict in a candidate row must not masquerade as table commentary."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer.\n"
+            "| Opportunity | Decision | Notes |\n| --- | --- | --- |\n"
+            "| remediation audit | TEST | Verdict: WATCH |"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("overall verdict" in failure for failure in result["failures"]))
+
     def test_discovery_rejects_conflicting_decision_table_row(self):
         """A table row with two decision cells must fail instead of being treated as one candidate decision."""
         case = validate_cases(CASES)[1]
