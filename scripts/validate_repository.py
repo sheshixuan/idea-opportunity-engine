@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 SKILL_NAME = "idea-opportunity-engine"
-PLUGIN_VERSION = "0.1.0"
+PLUGIN_VERSION = "0.1.1"
 PUBLIC_TARGET = "https://github.com/sheshixuan/idea-opportunity-engine"
 PUBLIC_GIT_TARGET = f"{PUBLIC_TARGET}.git"
 REFERENCE_FILES = {

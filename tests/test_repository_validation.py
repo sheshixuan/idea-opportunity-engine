@@ -15,7 +15,7 @@ class RepositoryValidationTests(unittest.TestCase):
             json.dumps(
                 {
                     "name": "idea-opportunity-engine",
-                    "version": "0.1.0",
+                    "version": "0.1.1",
                     "license": "MIT",
                     "homepage": "https://github.com/sheshixuan/idea-opportunity-engine",
                     "repository": "https://github.com/sheshixuan/idea-opportunity-engine",
@@ -128,7 +128,7 @@ class RepositoryValidationTests(unittest.TestCase):
     def test_plugin_metadata_mutations_are_reported(self):
         """Changing version, license, homepage, or repository must each break package validation."""
         for field, value in (
-            ("version", "0.1.1"),
+            ("version", "0.1.2"),
             ("license", "Apache-2.0"),
             ("homepage", "https://example.com"),
             ("repository", "https://example.com/repo"),
