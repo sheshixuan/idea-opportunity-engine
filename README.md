@@ -65,21 +65,51 @@ git pull --ff-only && (
   skill_dest="$skill_root/idea-opportunity-engine"
   test -d "$skill_dest" || { echo "No installed skill at $skill_dest" >&2; exit 1; }
   stage_dir="$(mktemp -d "$skill_root/.idea-opportunity-engine-update.XXXXXX")" || exit 1
+  staged_skill="$stage_dir/idea-opportunity-engine"
+  backup_skill="$stage_dir/previous"
+  preserve_recovery() {
+    keep_stage=1
+    echo "Automatic restore failed. Recovery copy retained at: $backup_skill" >&2
+  }
+  restore_previous() {
+    if [ -e "$skill_dest" ]; then
+      rm -rf "$skill_dest" || { preserve_recovery; return 1; }
+    fi
+    if mv "$backup_skill" "$skill_dest"; then
+      return 0
+    fi
+    preserve_recovery
+    return 1
+  }
+  keep_stage=0
   cleanup() {
     exit_code=$?
-    if [ -d "$stage_dir/previous" ] && [ ! -e "$skill_dest" ]; then
-      mv "$stage_dir/previous" "$skill_dest" || true
+    if [ "$keep_stage" -eq 1 ]; then
+      trap - EXIT HUP INT TERM
+      exit "$exit_code"
     fi
     rm -rf "$stage_dir"
     trap - EXIT HUP INT TERM
     exit "$exit_code"
   }
   trap cleanup EXIT HUP INT TERM
-  cp -R skills/idea-opportunity-engine "$stage_dir/idea-opportunity-engine"
-  test -f "$stage_dir/idea-opportunity-engine/SKILL.md" || { echo "Staged skill is incomplete" >&2; exit 1; }
-  mv "$skill_dest" "$stage_dir/previous"
-  mv "$stage_dir/idea-opportunity-engine" "$skill_dest"
-  rm -rf "$stage_dir/previous"
+  cp -R skills/idea-opportunity-engine "$staged_skill"
+  test -f "$staged_skill/SKILL.md" || { echo "Staged skill is incomplete" >&2; exit 1; }
+  if ! mv "$skill_dest" "$backup_skill"; then
+    echo "Could not move existing skill to backup; update aborted." >&2
+    exit 1
+  fi
+  if [ ! -d "$backup_skill" ] || [ -e "$skill_dest" ]; then
+    preserve_recovery
+    exit 1
+  fi
+  if mv "$staged_skill" "$skill_dest" && [ -f "$skill_dest/SKILL.md" ] && [ ! -e "$skill_dest/idea-opportunity-engine" ]; then
+    rm -rf "$backup_skill"
+    exit 0
+  fi
+  echo "Could not install staged skill; attempting restore." >&2
+  restore_previous || exit 1
+  exit 1
 )
 ```
 
