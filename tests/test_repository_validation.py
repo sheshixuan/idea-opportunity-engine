@@ -12,7 +12,16 @@ class RepositoryValidationTests(unittest.TestCase):
         (root / ".codex-plugin").mkdir()
         (root / "skills" / "idea-opportunity-engine").mkdir(parents=True)
         (root / ".codex-plugin" / "plugin.json").write_text(
-            json.dumps({"name": "idea-opportunity-engine", "skills": "./skills/"})
+            json.dumps(
+                {
+                    "name": "idea-opportunity-engine",
+                    "version": "0.1.0",
+                    "license": "MIT",
+                    "homepage": "https://github.com/sheshixuan/idea-opportunity-engine",
+                    "repository": "https://github.com/sheshixuan/idea-opportunity-engine",
+                    "skills": "./skills/",
+                }
+            )
         )
         (root / "skills" / "idea-opportunity-engine" / "SKILL.md").write_text(
             "---\nname: idea-opportunity-engine\ndescription: Use when evaluating opportunities.\n---\n"
@@ -21,7 +30,17 @@ class RepositoryValidationTests(unittest.TestCase):
             (root / "skills" / "idea-opportunity-engine" / "references").mkdir(exist_ok=True)
             (root / "skills" / "idea-opportunity-engine" / "references" / name).write_text("reference")
         (root / ".agents" / "plugins").mkdir(parents=True)
-        (root / ".agents" / "plugins" / "marketplace.json").write_text("{}")
+        (root / "skills" / "idea-opportunity-engine" / "agents").mkdir()
+        (root / "skills" / "idea-opportunity-engine" / "agents" / "openai.yaml").write_text("interface: {}\n")
+        (root / ".agents" / "plugins" / "marketplace.json").write_text(
+            json.dumps(
+                {
+                    "plugins": [
+                        {"name": "idea-opportunity-engine", "source": {"source": "local", "path": "./"}}
+                    ]
+                }
+            )
+        )
         (root / "README.md").write_text("documentation")
         (root / "LICENSE").write_text("MIT")
         (root / "install.sh").write_text("#!/bin/sh\n")
@@ -51,8 +70,41 @@ class RepositoryValidationTests(unittest.TestCase):
         """Removing the marketplace plugin/source checks must accept this empty manifest."""
         with tempfile.TemporaryDirectory() as temporary:
             self.make_valid_tree(temporary)
+            (Path(temporary) / ".agents" / "plugins" / "marketplace.json").write_text("{}")
             errors = validate_repository(Path(temporary))
             self.assertTrue(any("marketplace" in error for error in errors), errors)
+
+    def test_complete_valid_tree_has_no_errors(self):
+        """Adding a valid package requirement must keep this full synthetic tree valid."""
+        with tempfile.TemporaryDirectory() as temporary:
+            self.make_valid_tree(temporary)
+            self.assertEqual([], validate_repository(Path(temporary)))
+
+    def test_extra_markdown_reference_is_reported(self):
+        """Allowing an unapproved reference file must invalidate the exact reference contract."""
+        with tempfile.TemporaryDirectory() as temporary:
+            self.make_valid_tree(temporary)
+            references = Path(temporary) / "skills" / "idea-opportunity-engine" / "references"
+            (references / "extra.md").write_text("unapproved")
+            errors = validate_repository(Path(temporary))
+            self.assertTrue(any("reference files" in error for error in errors), errors)
+
+    def test_plugin_metadata_mutations_are_reported(self):
+        """Changing version, license, homepage, or repository must each break package validation."""
+        for field, value in (
+            ("version", "0.1.1"),
+            ("license", "Apache-2.0"),
+            ("homepage", "https://example.com"),
+            ("repository", "https://example.com/repo"),
+        ):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temporary:
+                self.make_valid_tree(temporary)
+                plugin_path = Path(temporary) / ".codex-plugin" / "plugin.json"
+                plugin = json.loads(plugin_path.read_text())
+                plugin[field] = value
+                plugin_path.write_text(json.dumps(plugin))
+                errors = validate_repository(Path(temporary))
+                self.assertTrue(any(field in error for error in errors), errors)
 
 
 if __name__ == "__main__":

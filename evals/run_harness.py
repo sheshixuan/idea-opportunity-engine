@@ -11,8 +11,23 @@ from pathlib import Path
 DECISIONS = {"GO", "TEST", "WATCH", "KILL"}
 MODES = {"discovery", "validation", "portfolio", "boundary"}
 CASE_ID = re.compile(r"^\d{3}$")
-DECISION_LABEL = re.compile(r"\b(?:verdict|decision)\s*:\s*\**(GO|TEST|WATCH|KILL)\b", re.IGNORECASE)
+DECISION_LABEL = re.compile(
+    r"\b(?P<label>verdict|decision)(?:\*\*)?\s*:\s*\**\s*(?P<decision>GO|TEST|WATCH|KILL)\b",
+    re.IGNORECASE,
+)
+CANDIDATE_HEADING = re.compile(r"(?im)^\s*#{1,6}\s+candidate\b.*$")
 ANALYSIS_MARKER = re.compile(r"\b(?:verdict|decision|score)\s*:", re.IGNORECASE)
+SEMANTIC_ANALYSIS_MARKERS = (
+    "evidence ledger",
+    "claim ledger",
+    "willingness to pay",
+    "paid pilot",
+    "failure threshold",
+    "success threshold",
+    "decision card",
+    "adjusted score",
+    "100-point",
+)
 
 
 def _case_errors(case, path):
@@ -88,16 +103,33 @@ def score_response(case, text):
     normalized = text.lower()
     failures = []
     if not case["should_trigger"]:
-        if ANALYSIS_MARKER.search(text):
+        semantic_marker_count = sum(marker in normalized for marker in SEMANTIC_ANALYSIS_MARKERS)
+        if ANALYSIS_MARKER.search(text) or semantic_marker_count >= 2:
             failures.append("case must not trigger an opportunity analysis")
     else:
-        decisions = [match.group(1).upper() for match in DECISION_LABEL.finditer(text)]
-        if not decisions:
+        matches = list(DECISION_LABEL.finditer(text))
+        decisions = [match.group("decision").upper() for match in matches]
+        if not matches:
             failures.append("response must state a labeled GO/TEST/WATCH/KILL decision")
-        elif case["mode"] != "portfolio" and len(decisions) != 1:
-            failures.append("response must state exactly one labeled decision")
         elif not set(decisions).issubset(set(case["allowed_decisions"])):
             failures.append("response decision is not allowed for this case")
+        elif case["mode"] == "validation" and len(matches) != 1:
+            failures.append("response must state exactly one labeled decision")
+        elif case["mode"] in {"discovery", "portfolio"}:
+            headings = list(CANDIDATE_HEADING.finditer(text))
+            if headings:
+                candidate_match_ranges = []
+                for index, heading in enumerate(headings):
+                    end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
+                    candidate_matches = list(DECISION_LABEL.finditer(text, heading.end(), end))
+                    candidate_match_ranges.extend((match.start(), match.end()) for match in candidate_matches)
+                    if len(candidate_matches) != 1:
+                        failures.append("each candidate must state exactly one labeled decision")
+                for match in matches:
+                    in_candidate = any(start <= match.start() < end for start, end in candidate_match_ranges)
+                    if match.group("label").lower() == "decision" and not in_candidate:
+                        failures.append("candidate decisions must appear under a candidate heading")
+                        break
     for group in case["required_behavior_groups"]:
         if not any(phrase.lower() in normalized for phrase in group):
             failures.append(f"missing required behavior group: {' | '.join(group)}")

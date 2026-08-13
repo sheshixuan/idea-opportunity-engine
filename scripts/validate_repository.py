@@ -9,6 +9,14 @@ from pathlib import Path
 
 
 SKILL_NAME = "idea-opportunity-engine"
+PLUGIN_VERSION = "0.1.0"
+PUBLIC_TARGET = "https://github.com/sheshixuan/idea-opportunity-engine"
+REFERENCE_FILES = {
+    "evidence-policy.md",
+    "experiment-framework.md",
+    "report-template.md",
+    "scoring-model.md",
+}
 REQUIRED_PATHS = (
     ".codex-plugin/plugin.json",
     ".agents/plugins/marketplace.json",
@@ -61,6 +69,14 @@ def validate_repository(root):
                 errors.append(f"plugin name {plugin.get('name')!r} does not match {SKILL_NAME!r}")
             if plugin.get("skills") != "./skills/":
                 errors.append("plugin skills path must be './skills/'")
+            if plugin.get("version") != PLUGIN_VERSION:
+                errors.append(f"plugin version must be {PLUGIN_VERSION!r}")
+            if plugin.get("license") != "MIT":
+                errors.append("plugin license must be 'MIT'")
+            if plugin.get("homepage") != PUBLIC_TARGET:
+                errors.append(f"plugin homepage must be {PUBLIC_TARGET!r}")
+            if plugin.get("repository") != PUBLIC_TARGET:
+                errors.append(f"plugin repository must be {PUBLIC_TARGET!r}")
 
     marketplace_path = root / ".agents" / "plugins" / "marketplace.json"
     if marketplace_path.is_file():
@@ -89,6 +105,15 @@ def validate_repository(root):
             errors.append(f"invalid SKILL.md: {problem}")
         elif skill_name != SKILL_NAME:
             errors.append(f"skill name {skill_name!r} does not match plugin name {SKILL_NAME!r}")
+    references_path = root / "skills" / SKILL_NAME / "references"
+    if references_path.is_dir():
+        actual_references = {
+            path.relative_to(references_path).as_posix()
+            for path in references_path.rglob("*.md")
+            if path.is_file()
+        }
+        if actual_references != REFERENCE_FILES:
+            errors.append("reference files must be exactly the four approved Markdown references")
     return errors
 
 

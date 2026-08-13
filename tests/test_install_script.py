@@ -134,6 +134,47 @@ class InstallScriptTests(unittest.TestCase):
             self.assertEqual(1, len(recovery_dirs), result.stderr)
             self.assertEqual("old skill", (recovery_dirs[0] / "previous" / "SKILL.md").read_text())
 
+    def test_failed_staged_install_and_removal_failure_preserve_backup(self):
+        """An rm failure after backup movement must not let EXIT cleanup destroy recovery."""
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "skills"
+            installed = destination / "idea-opportunity-engine"
+            installed.mkdir(parents=True)
+            (installed / "SKILL.md").write_text("old skill")
+            fake_bin = Path(temporary) / "fake-bin"
+            fake_bin.mkdir()
+            (fake_bin / "mv").write_text(
+                "#!/bin/sh\n"
+                "case \"$2\" in\n"
+                "  */idea-opportunity-engine) case \"$1\" in */.idea-opportunity-engine-install.*/*) exit 1 ;; esac ;;\n"
+                "esac\n"
+                "/bin/mv \"$@\"\n"
+            )
+            (fake_bin / "rm").write_text(
+                "#!/bin/sh\n"
+                "for argument in \"$@\"; do\n"
+                "  case \"$argument\" in */skills/idea-opportunity-engine) exit 1 ;; esac\n"
+                "done\n"
+                "/bin/rm \"$@\"\n"
+            )
+            for command in fake_bin.iterdir():
+                command.chmod(0o755)
+            environment = os.environ.copy()
+            environment["PATH"] = f"{fake_bin}:{environment['PATH']}"
+            result = subprocess.run(
+                [str(INSTALLER), "--update", "--dest", str(destination)],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            recovery_dirs = list(destination.glob(".idea-opportunity-engine-install.*"))
+            self.assertNotEqual(0, result.returncode)
+            self.assertEqual(1, len(recovery_dirs), result.stderr)
+            self.assertEqual("old skill", (recovery_dirs[0] / "previous" / "SKILL.md").read_text())
+            self.assertIn("Recovery copy retained", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

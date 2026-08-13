@@ -87,6 +87,10 @@ stage_and_install() {
   stage_dir=$(mktemp -d "$destination/.idea-opportunity-engine-install.XXXXXX") || exit 1
   keep_stage=0
   backup_moved=0
+  preserve_recovery() {
+    keep_stage=1
+    echo "Recovery copy retained at: $backup_skill" >&2
+  }
   cleanup() {
     exit_code=$?
     if [ "$keep_stage" -eq 0 ]; then
@@ -97,10 +101,11 @@ stage_and_install() {
   }
   interrupted() {
     if [ "$backup_moved" -eq 1 ]; then
-      keep_stage=1
-      echo "Interrupted after backup. Recovery copy retained at: $backup_skill" >&2
+      preserve_recovery
+      trap - EXIT HUP INT TERM
+      exit 128
     fi
-    trap - EXIT HUP INT TERM
+    trap - HUP INT TERM
     exit 128
   }
   trap cleanup EXIT
@@ -124,23 +129,30 @@ stage_and_install() {
   fi
 
   backup_skill="$stage_dir/previous"
+  backup_moved=1
   if ! mv "$skill_dest" "$backup_skill"; then
+    backup_moved=0
     echo "Could not move existing skill to backup; update aborted." >&2
     exit 1
   fi
-  backup_moved=1
   if mv "$staged_skill" "$skill_dest" && [ -f "$skill_dest/SKILL.md" ]; then
-    rm -rf -- "$backup_skill"
+    if ! rm -rf -- "$backup_skill"; then
+      preserve_recovery
+      exit 1
+    fi
     echo "Updated $skill_dest"
     return 0
   fi
   echo "Could not install staged skill; attempting restore." >&2
-  rm -rf -- "$skill_dest"
-  if mv "$backup_skill" "$skill_dest"; then
+  if ! rm -rf -- "$skill_dest"; then
+    preserve_recovery
     exit 1
   fi
-  keep_stage=1
-  echo "Automatic restore failed. Recovery copy retained at: $backup_skill" >&2
+  if mv "$backup_skill" "$skill_dest"; then
+    backup_moved=0
+    exit 1
+  fi
+  preserve_recovery
   exit 1
 }
 
