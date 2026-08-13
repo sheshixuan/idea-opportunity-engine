@@ -1,0 +1,4 @@
+interface:
+  display_name: "Idea Opportunity Engine"
+  short_description: "Evidence-first opportunity discovery and validation"
+  default_prompt: "Use $idea-opportunity-engine to evaluate this business opportunity and design the cheapest decisive test."

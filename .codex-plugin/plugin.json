@@ -1,0 +1,24 @@
+{
+  "name": "idea-opportunity-engine",
+  "version": "0.1.0",
+  "description": "Evidence-first business opportunity discovery and validation for Codex.",
+  "author": {
+    "name": "sheshixuan",
+    "url": "https://github.com/sheshixuan"
+  },
+  "homepage": "https://github.com/sheshixuan/idea-opportunity-engine",
+  "repository": "https://github.com/sheshixuan/idea-opportunity-engine",
+  "license": "MIT",
+  "keywords": ["business-opportunity", "validation", "evidence", "experiments"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Idea Opportunity Engine",
+    "shortDescription": "Evidence-first opportunity discovery and validation.",
+    "longDescription": "Evaluate business opportunities with explicit evidence, alternatives, willingness to pay, a 100-point score, and the cheapest decisive experiment.",
+    "developerName": "sheshixuan",
+    "category": "Productivity",
+    "capabilities": ["Analysis", "Research"],
+    "websiteURL": "https://github.com/sheshixuan/idea-opportunity-engine",
+    "defaultPrompt": "Evaluate this business opportunity and design the cheapest decisive test."
+  }
+}
