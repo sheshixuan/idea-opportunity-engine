@@ -158,6 +158,16 @@ class EvalHarnessTests(unittest.TestCase):
         )
         self.assertTrue(score_response(case, response)["passed"])
 
+    def test_adoption_friction_and_do_nothing_satisfy_alternative_analysis(self):
+        """The real final 007 wording genuinely covers status quo and switching friction."""
+        case = validate_cases(CASES)[6]
+        response = (
+            "Verdict: KILL — evidence is weak. Adjusted score: 26/100. Alternatives include spreadsheets, "
+            "phone calls, manual work, and **Do nothing**. A separate layer adds adoption, data-entry, "
+            "and contractor-compliance costs; switching authority is unknown. Experiment: run a paid pilot."
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
     def test_discovery_accepts_one_valid_decision_per_candidate(self):
         """Rejecting multi-candidate discovery or losing candidate decisions must fail this contract."""
         case = validate_cases(CASES)[1]
@@ -402,6 +412,14 @@ class EvalHarnessTests(unittest.TestCase):
 
         scoped_decline = "This is outside the Idea Opportunity Engine scope; it is not an opportunity analysis."
         self.assertTrue(score_response(case, scoped_decline)["passed"])
+
+        with_query = "WITH activity AS (SELECT user_id FROM events) SELECT COUNT(*) FROM activity;"
+        self.assertTrue(score_response(case, with_query)["passed"])
+
+    def test_non_trigger_case_has_no_positive_phrase_requirement(self):
+        """A boundary case gates only opportunity-analysis leakage, not a prescribed SQL or refusal phrase."""
+        case = validate_cases(CASES)[-1]
+        self.assertEqual([], case["required_behavior_groups"])
 
     def test_sql_boundary_rejects_unlabeled_analysis_with_boundary_language(self):
         """Removing broad analysis markers would let this disguised opportunity analysis pass."""

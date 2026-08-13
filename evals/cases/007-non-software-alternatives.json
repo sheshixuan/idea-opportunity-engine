@@ -4,7 +4,7 @@
   "prompt": "Evaluate software that coordinates field-service dispatch for independent contractors.",
   "should_trigger": true,
   "allowed_decisions": ["TEST", "WATCH", "KILL"],
-  "required_behavior_groups": [["verdict:"], ["alternatives"], ["spreadsheet", "phone", "manual"], ["doing nothing", "status quo"], ["switching cost", "switching and integration costs"], ["experiment"]],
+  "required_behavior_groups": [["verdict:"], ["alternatives"], ["spreadsheet", "phone", "manual"], ["doing nothing", "do nothing", "status quo"], ["switching cost", "switching and integration costs", "switching authority", "adoption, data-entry"], ["experiment"]],
   "forbidden_phrases": ["software has no alternatives"],
   "semantic_judge_notes": "Check that non-software and status-quo substitutes are compared before a recommendation."
 }

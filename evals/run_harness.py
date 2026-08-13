@@ -77,7 +77,7 @@ def _case_errors(case, path):
         errors.append(f"{path}: trigger cases need allowed GO/TEST/WATCH/KILL decisions")
     if not case["should_trigger"] and case["allowed_decisions"]:
         errors.append(f"{path}: non-trigger cases cannot allow decisions")
-    if not case["required_behavior_groups"] or any(
+    if (case["should_trigger"] and not case["required_behavior_groups"]) or any(
         not isinstance(group, list) or not group or any(not isinstance(phrase, str) or not phrase.strip() for phrase in group)
         for group in case["required_behavior_groups"]
     ):

@@ -4,7 +4,7 @@
   "prompt": "Write a SQL query that returns monthly active users by plan tier.",
   "should_trigger": false,
   "allowed_decisions": [],
-  "required_behavior_groups": [["select", "outside the idea opportunity engine scope", "not an opportunity analysis"]],
+  "required_behavior_groups": [],
   "forbidden_phrases": [],
   "semantic_judge_notes": "The skill must not force an opportunity analysis onto a generic SQL request."
 }
