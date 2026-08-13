@@ -7,10 +7,11 @@ An evidence-first Codex plugin and standalone skill for business opportunity dis
 After this repository is public, add its marketplace in Codex:
 
 ```bash
-codex plugin marketplace add sheshixuan/idea-opportunity-engine
+codex plugin marketplace add sheshixuan/idea-opportunity-engine --ref main
+codex plugin add idea-opportunity-engine@idea-opportunity-engine
 ```
 
-Install or enable **Idea Opportunity Engine** from the Codex plugin marketplace. The marketplace manifest exposes this repository root as the plugin and contains no MCP server, app, hook, API key, or paid-service requirement.
+Start a new Codex session after installation so the plugin's Skill is loaded. The marketplace manifest exposes this repository root as the plugin and contains no MCP server, app, hook, API key, or paid-service requirement.
 
 ## Install the standalone skill
 

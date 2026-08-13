@@ -134,6 +134,40 @@ class InstallScriptTests(unittest.TestCase):
             self.assertEqual(1, len(recovery_dirs), result.stderr)
             self.assertEqual("old skill", (recovery_dirs[0] / "previous" / "SKILL.md").read_text())
 
+    def test_interrupt_before_backup_keeps_existing_install_without_false_recovery_claim(self):
+        """A pre-move signal must not claim that a nonexistent previous backup is recoverable."""
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "skills"
+            installed = destination / "idea-opportunity-engine"
+            installed.mkdir(parents=True)
+            (installed / "SKILL.md").write_text("old skill")
+            fake_bin = Path(temporary) / "fake-bin"
+            fake_bin.mkdir()
+            fake_mv = fake_bin / "mv"
+            fake_mv.write_text(
+                "#!/bin/sh\n"
+                "case \"$2\" in\n"
+                "  */previous) kill -TERM \"$PPID\"; exit 143 ;;\n"
+                "esac\n"
+                "/bin/mv \"$@\"\n"
+            )
+            fake_mv.chmod(0o755)
+            environment = os.environ.copy()
+            environment["PATH"] = f"{fake_bin}:{environment['PATH']}"
+            result = subprocess.run(
+                [str(INSTALLER), "--update", "--dest", str(destination)],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertEqual("old skill", (installed / "SKILL.md").read_text())
+            self.assertIn("existing install remains", result.stderr)
+            self.assertNotIn("Recovery copy retained", result.stderr)
+            self.assertEqual([], list(destination.glob(".idea-opportunity-engine-install.*")))
+
     def test_failed_staged_install_and_removal_failure_preserve_backup(self):
         """An rm failure after backup movement must not let EXIT cleanup destroy recovery."""
         with tempfile.TemporaryDirectory() as temporary:

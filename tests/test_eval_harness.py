@@ -37,13 +37,13 @@ class EvalHarnessTests(unittest.TestCase):
         """Dropping any required group from this response must make scoring fail."""
         case = validate_cases(CASES)[0]
         response = (
-            "Verdict: TEST the workflow handoff idea.\n"
+            "Verdict: TEST — test the workflow handoff idea.\n"
             "Evidence: two teams reported missed handoffs.\n"
             "Contradiction: the sample may be unusually frustrated.\n"
             "Unknown: whether a buyer will pay.\n"
             "Alternatives include spreadsheets and doing nothing.\n"
             "Willingness to pay is unproven.\n"
-            "Score: 58/100; confidence: low.\n"
+            "Adjusted score: 75/100; confidence: low.\n"
             "Experiment: ask 10 qualified teams for a paid pilot; promote to GO if 3 pay, otherwise KILL."
         )
         result = score_response(case, response)
@@ -101,7 +101,7 @@ class EvalHarnessTests(unittest.TestCase):
         case = validate_cases(CASES)[0]
         response = (
             "**Verdict:** TEST. Evidence, contradiction, and unknowns are explicit. Alternatives include doing nothing. "
-            "Willingness to pay is unproven. Score: 58/100. Experiment has a failure threshold."
+            "Willingness to pay is unproven. Adjusted score: 75/100. Experiment has a failure threshold."
         )
         self.assertTrue(score_response(case, response)["passed"])
 
@@ -111,7 +111,29 @@ class EvalHarnessTests(unittest.TestCase):
         response = (
             "Verdict: `KILL` the broad idea. Evidence, contradiction, and unknowns are explicit. "
             "Alternatives include doing nothing. Willingness to pay is unproven. "
-            "Score: 10/100. Experiment has a failure threshold."
+            "Adjusted score: 10/100. Experiment has a failure threshold."
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
+    def test_validation_rejects_adjusted_score_that_conflicts_with_verdict(self):
+        """The real 008 pattern must fail when adjusted 0/100 is labeled TEST."""
+        case = validate_cases(CASES)[7]
+        response = (
+            "Verdict: TEST — test price sensitivity. Price and willingness to pay are unknown. "
+            "Alternatives exist. Adjusted score: 0/100. Experiment: run a price test. "
+            "Success threshold: 3 deposits. Failure threshold: fewer than 2."
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("adjusted score" in failure for failure in result["failures"]), result["failures"])
+
+    def test_validation_accepts_matching_adjusted_score_and_verdict(self):
+        """A validation verdict must pass when its sole adjusted score maps to that decision."""
+        case = validate_cases(CASES)[7]
+        response = (
+            "Verdict: TEST — test price sensitivity. Price and willingness to pay are unknown. "
+            "Alternatives exist. Adjusted score: 75/100. Experiment: run a price test. "
+            "Success threshold: 3 deposits. Failure threshold: fewer than 2."
         )
         self.assertTrue(score_response(case, response)["passed"])
 
@@ -119,11 +141,11 @@ class EvalHarnessTests(unittest.TestCase):
         """Rejecting multi-candidate discovery or losing candidate decisions must fail this contract."""
         case = validate_cases(CASES)[1]
         response = (
-            "**Verdict:** TEST the accessibility lead.\n"
+            "Verdict: TEST — Lead: remediation audit.\n"
             "Target user: small ecommerce teams. Accessibility is the market change. "
             "Alternatives and willingness to pay are unknown. Experiment: test a paid offer.\n"
-            "## Candidate A: remediation audit\n**Decision:** TEST\n"
-            "## Candidate B: training service\n**Decision:** WATCH"
+            "## Candidate: remediation audit\nAdjusted score: 75/100\n**Decision:** TEST\n"
+            "## Candidate: training service\nAdjusted score: 55/100\n**Decision:** WATCH"
         )
         self.assertTrue(score_response(case, response)["passed"])
 
@@ -131,9 +153,9 @@ class EvalHarnessTests(unittest.TestCase):
         """Adding a second decision under one candidate must fail rather than be silently accepted."""
         case = validate_cases(CASES)[1]
         response = (
-            "**Verdict:** TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Verdict: TEST — Lead: remediation audit. Target user: small ecommerce teams. "
             "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
-            "Experiment: test a paid offer.\n## Candidate A\n**Decision:** TEST\n**Decision:** WATCH"
+            "Experiment: test a paid offer.\n## Candidate: remediation audit\nAdjusted score: 75/100\n**Decision:** TEST\n**Decision:** WATCH"
         )
         result = score_response(case, response)
         self.assertFalse(result["passed"])
@@ -149,17 +171,17 @@ class EvalHarnessTests(unittest.TestCase):
         )
         result = score_response(case, response)
         self.assertFalse(result["passed"])
-        self.assertTrue(any("unstructured" in failure for failure in result["failures"]))
+        self.assertTrue(any("candidate headings or a candidate table" in failure for failure in result["failures"]))
 
     def test_discovery_accepts_one_decision_per_candidate_table_row(self):
         """Breaking decision-table parsing must reject this two-candidate discovery response."""
         case = validate_cases(CASES)[1]
         response = (
-            "**Verdict:** TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Verdict: TEST — Lead: remediation audit. Target user: small ecommerce teams. "
             "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
             "Experiment: test a paid offer.\n"
-            "| Opportunity | Decision |\n| --- | --- |\n"
-            "| remediation audit | TEST |\n| training service | WATCH |"
+            "| Opportunity | Adjusted score | Decision |\n| --- | ---: | --- |\n"
+            "| remediation audit | 75/100 | TEST |\n| training service | 55/100 | WATCH |"
         )
         self.assertTrue(score_response(case, response)["passed"])
 
@@ -167,13 +189,63 @@ class EvalHarnessTests(unittest.TestCase):
         """Markdown code styling around exact decision cells must preserve their meaning."""
         case = validate_cases(CASES)[1]
         response = (
-            "Verdict: `TEST` the accessibility lead. Target user: small ecommerce teams. "
+            "Verdict: `TEST` — Lead: remediation audit. Target user: small ecommerce teams. "
             "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
             "Experiment: test a paid offer.\n"
-            "| Opportunity | Decision |\n| --- | --- |\n"
-            "| remediation audit | `TEST` |\n| training service | `WATCH` |"
+            "| Opportunity | Adjusted score | Decision |\n| --- | ---: | --- |\n"
+            "| remediation audit | `75/100` | `TEST` |\n| training service | `55/100` | `WATCH` |"
         )
         self.assertTrue(score_response(case, response)["passed"])
+
+    def test_discovery_rejects_lead_verdict_that_conflicts_with_candidate_decision(self):
+        """The real 002 pattern must fail when a TEST lead candidate row says WATCH."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: TEST — Lead: remediation sprint. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer.\n"
+            "| Candidate | Adjusted score | Decision |\n| --- | ---: | --- |\n"
+            "| remediation sprint | 63/100 | WATCH |\n| evidence pack | 35/100 | KILL |"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("lead" in failure for failure in result["failures"]), result["failures"])
+
+    def test_discovery_accepts_matching_lead_and_candidate_table_scores(self):
+        """A named lead and every candidate table score must map to their decisions."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: WATCH — Lead: remediation sprint. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer.\n"
+            "| Candidate | Adjusted score | Decision |\n| --- | ---: | --- |\n"
+            "| remediation sprint | 63/100 | WATCH |\n| evidence pack | 35/100 | KILL |"
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
+    def test_portfolio_accepts_matching_heading_candidate_scores(self):
+        """Heading-shaped candidates must pair each adjusted score with one decision and the named lead."""
+        case = validate_cases(CASES)[8]
+        response = (
+            "Verdict: TEST — Lead: renewal-backed offer. Conflicting survey evidence is weaker than paid renewal. "
+            "Confidence: medium. Score: 75. Experiment: expand the paid pilot.\n"
+            "## Candidate: survey-backed offer\nAdjusted score: 55/100\nDecision: WATCH\n"
+            "## Candidate: renewal-backed offer\nAdjusted score: 75/100\nDecision: TEST"
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
+    def test_portfolio_rejects_heading_candidate_score_decision_mismatch(self):
+        """A heading candidate cannot label a 45/100 adjusted score as TEST."""
+        case = validate_cases(CASES)[8]
+        response = (
+            "Verdict: TEST — Lead: renewal-backed offer. Conflicting survey evidence is weaker than paid renewal. "
+            "Confidence: medium. Score: 75. Experiment: expand the paid pilot.\n"
+            "## Candidate: survey-backed offer\nAdjusted score: 55/100\nDecision: WATCH\n"
+            "## Candidate: renewal-backed offer\nAdjusted score: 45/100\nDecision: TEST"
+        )
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("adjusted score" in failure for failure in result["failures"]), result["failures"])
 
     def test_discovery_cases_allow_killing_non_lead_candidates(self):
         """A discovery must be able to reject a weak candidate while recommending a viable lead."""
@@ -185,8 +257,9 @@ class EvalHarnessTests(unittest.TestCase):
         """Typography must not hide an otherwise explicit 30-day constraint from scoring."""
         case = validate_cases(CASES)[5]
         response = (
-            "Verdict: TEST the lead. A two-person team can run a 30‑day experiment within a $2,000 budget. "
-            "The cost is capped and the success threshold is two deposits."
+            "Verdict: TEST — Lead: service sprint. A two-person team can run a 30‑day experiment within a $2,000 budget. "
+            "The cost is capped and the success threshold is two deposits.\n"
+            "| Candidate | Adjusted score | Decision |\n| --- | ---: | --- |\n| service sprint | 75/100 | TEST |"
         )
         self.assertTrue(score_response(case, response)["passed"])
 
@@ -194,11 +267,11 @@ class EvalHarnessTests(unittest.TestCase):
         """An overall Decision before a valid table must not supplement the lead Verdict."""
         case = validate_cases(CASES)[1]
         response = (
-            "Verdict: TEST the accessibility lead.\nDecision: WATCH\n"
+            "Verdict: TEST — Lead: remediation audit.\nDecision: WATCH\n"
             "Target user: small ecommerce teams. Accessibility is the market change. "
             "Alternatives and willingness to pay are unknown. Experiment: test a paid offer.\n"
-            "| Opportunity | Decision |\n| --- | --- |\n"
-            "| remediation audit | TEST |\n| training service | WATCH |"
+            "| Opportunity | Adjusted score | Decision |\n| --- | ---: | --- |\n"
+            "| remediation audit | 75/100 | TEST |\n| training service | 55/100 | WATCH |"
         )
         result = score_response(case, response)
         self.assertFalse(result["passed"])
@@ -208,10 +281,10 @@ class EvalHarnessTests(unittest.TestCase):
         """An overall Decision after a valid table must not add another labeled decision."""
         case = validate_cases(CASES)[8]
         response = (
-            "Verdict: TEST the renewal-backed opportunity. Conflicting survey evidence is weaker "
+            "Verdict: TEST — Portfolio lead: renewal-backed concept. Conflicting survey evidence is weaker "
             "than paid renewal behavior. Confidence: medium. Score: 72. Experiment: expand the paid pilot.\n"
-            "| Opportunity | Decision |\n| --- | --- |\n"
-            "| survey-backed concept | WATCH |\n| renewal-backed concept | TEST |\n"
+            "| Opportunity | Adjusted score | Decision |\n| --- | ---: | --- |\n"
+            "| survey-backed concept | 55/100 | WATCH |\n| renewal-backed concept | 75/100 | TEST |\n"
             "Decision: WATCH"
         )
         result = score_response(case, response)
@@ -222,11 +295,11 @@ class EvalHarnessTests(unittest.TestCase):
         """A Verdict in a candidate row must not masquerade as table commentary."""
         case = validate_cases(CASES)[1]
         response = (
-            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Verdict: TEST — Lead: remediation audit. Target user: small ecommerce teams. "
             "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
             "Experiment: test a paid offer.\n"
-            "| Opportunity | Decision | Notes |\n| --- | --- | --- |\n"
-            "| remediation audit | TEST | Verdict: WATCH |"
+            "| Opportunity | Adjusted score | Decision | Notes |\n| --- | ---: | --- | --- |\n"
+            "| remediation audit | 75/100 | TEST | Verdict: WATCH |"
         )
         result = score_response(case, response)
         self.assertFalse(result["passed"])
@@ -236,11 +309,11 @@ class EvalHarnessTests(unittest.TestCase):
         """A table row with two decision cells must fail instead of being treated as one candidate decision."""
         case = validate_cases(CASES)[1]
         response = (
-            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Verdict: TEST — Lead: remediation audit. Target user: small ecommerce teams. "
             "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
             "Experiment: test a paid offer.\n"
-            "| Opportunity | Decision |\n| --- | --- |\n"
-            "| remediation audit | TEST / WATCH |"
+            "| Opportunity | Adjusted score | Decision |\n| --- | ---: | --- |\n"
+            "| remediation audit | 75/100 | TEST / WATCH |"
         )
         result = score_response(case, response)
         self.assertFalse(result["passed"])
@@ -250,9 +323,9 @@ class EvalHarnessTests(unittest.TestCase):
         """A second overall Verdict in a heading response must not be mistaken for a candidate decision."""
         case = validate_cases(CASES)[1]
         response = (
-            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Verdict: TEST — Lead: remediation audit. Target user: small ecommerce teams. "
             "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
-            "Experiment: test a paid offer.\n## Candidate A\nDecision: TEST\nVerdict: WATCH"
+            "Experiment: test a paid offer.\n## Candidate: remediation audit\nAdjusted score: 75/100\nDecision: TEST\nVerdict: WATCH"
         )
         result = score_response(case, response)
         self.assertFalse(result["passed"])
@@ -262,10 +335,10 @@ class EvalHarnessTests(unittest.TestCase):
         """A table must not allow a contradictory second lead Verdict after its rows."""
         case = validate_cases(CASES)[1]
         response = (
-            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Verdict: TEST — Lead: remediation audit. Target user: small ecommerce teams. "
             "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
-            "Experiment: test a paid offer.\n| Opportunity | Decision |\n| --- | --- |\n"
-            "| remediation audit | TEST |\nVerdict: WATCH"
+            "Experiment: test a paid offer.\n| Opportunity | Adjusted score | Decision |\n| --- | ---: | --- |\n"
+            "| remediation audit | 75/100 | TEST |\nVerdict: WATCH"
         )
         result = score_response(case, response)
         self.assertFalse(result["passed"])
@@ -277,21 +350,23 @@ class EvalHarnessTests(unittest.TestCase):
         response = (
             "Target user: small ecommerce teams. Accessibility is the market change. "
             "Alternatives and willingness to pay are unknown. Experiment: test a paid offer.\n"
-            "## Candidate A\nDecision: TEST\nVerdict: TEST the accessibility lead."
+            "## Candidate: remediation audit\nAdjusted score: 75/100\nDecision: TEST\nVerdict: TEST — Lead: remediation audit."
         )
         result = score_response(case, response)
         self.assertFalse(result["passed"])
         self.assertTrue(any("first labeled decision" in failure for failure in result["failures"]))
 
-    def test_discovery_accepts_lead_first_unstructured_verdict(self):
-        """A single lead-first Verdict remains valid when no candidate structure is used."""
+    def test_discovery_rejects_lead_first_unstructured_verdict(self):
+        """A lead verdict without a score/decision candidate structure cannot be checked consistently."""
         case = validate_cases(CASES)[1]
         response = (
-            "Verdict: TEST the accessibility lead. Target user: small ecommerce teams. "
+            "Verdict: TEST — Lead: accessibility audit. Target user: small ecommerce teams. "
             "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
             "Experiment: test a paid offer."
         )
-        self.assertTrue(score_response(case, response)["passed"])
+        result = score_response(case, response)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("candidate headings or a candidate table" in failure for failure in result["failures"]))
 
     def test_sql_boundary_rejects_opportunity_analysis(self):
         """Giving a SQL request a GO/TEST/WATCH/KILL analysis must fail the boundary case."""

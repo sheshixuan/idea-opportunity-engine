@@ -29,9 +29,9 @@ State confidence separately as high, medium, or low. Confidence reflects evidenc
 
 | Adjusted score | Confidence and gate | Decision |
 | --- | --- | --- |
-| 80–100 | High confidence; behavioral or operational evidence and a payment signal | `GO` |
-| 60–79 | Viable but one decisive uncertainty remains | `TEST` |
-| 40–59 | Meaningful uncertainty, weak timing, or limited evidence | `WATCH` |
-| 0–39 | Weak economics, weak evidence, or no credible path to payment | `KILL` |
+| 90–100 | High confidence; behavioral or operational evidence and a payment signal | `GO` |
+| 70–89 | Viable but one decisive uncertainty remains | `TEST` |
+| 50–69 | Meaningful uncertainty, weak timing, or limited evidence | `WATCH` |
+| 0–49 | Weak economics, weak evidence, or no credible path to payment | `KILL` |
 
-Downgrade `GO` to `TEST` if its evidence gate is not met. The decision is a prioritization aid, not an investment recommendation.
+If the evidence gate for `GO` is not met, cap the adjusted score at 89 so the score and `TEST` decision remain consistent. The decision is a prioritization aid, not an investment recommendation.

@@ -17,7 +17,7 @@ Produce a decision aid, not encouragement. Do not claim certainty where the evid
 
 ## Required response standard
 
-- Lead with exactly `Verdict: GO`, `Verdict: TEST`, `Verdict: WATCH`, or `Verdict: KILL`, followed by the rationale on that line. Validation must not add another labeled `Verdict:` or `Decision:` elsewhere. Discovery and Portfolio use that one lead verdict, then give each candidate exactly one decision in a Markdown table `Decision` cell or under a `Candidate` heading as `Decision: GO|TEST|WATCH|KILL`; do not repeat labeled decisions in later prose.
+- Follow the exact report contract in `report-template.md`. Validation begins `Verdict: <DECISION> — <rationale>` and contains exactly one `Adjusted score: <integer>/100`; that score must map to the verdict. Discovery begins `Verdict: <DECISION> — Lead: <candidate name>.` Portfolio begins `Verdict: <DECISION> — Portfolio lead: <candidate name>.` The lead name must exactly match a candidate name and its decision must equal the overall verdict. Give every candidate exactly one adjusted score and one mapped decision using the required table columns or `## Candidate: <name>` section fields. Do not repeat adjusted scores or labeled decisions in later prose.
 - Separate observed evidence, interpretation, contradiction, and unknown. Never present a hypothesis, market-size estimate, or AI popularity as proof of demand.
 - Name alternatives before recommending a solution; include non-software and status-quo alternatives when relevant.
 - Treat willingness to pay as unproven unless there is a credible payment or commitment signal.

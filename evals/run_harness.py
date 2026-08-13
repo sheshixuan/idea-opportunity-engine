@@ -15,7 +15,18 @@ DECISION_LABEL = re.compile(
     r"\b(?P<label>verdict|decision)(?:\*\*)?\s*:\s*[\*`]*\s*(?P<decision>GO|TEST|WATCH|KILL)\b",
     re.IGNORECASE,
 )
-CANDIDATE_HEADING = re.compile(r"(?im)^\s*#{1,6}\s+candidate\b.*$")
+CANDIDATE_HEADING = re.compile(
+    r"(?im)^\s*#{1,6}\s+candidate(?:\s*:\s*|\s+)(?P<name>.+?)\s*$"
+)
+ADJUSTED_SCORE = re.compile(
+    r"\badjusted score(?:\*\*)?\s*:\s*[\*`]*(?P<score>100|[1-9]?\d)\s*/\s*100\b",
+    re.IGNORECASE,
+)
+LEAD_VERDICT = re.compile(
+    r"^\s*(?:\*\*)?verdict(?:\*\*)?\s*:\s*[\*`]*(?P<decision>GO|TEST|WATCH|KILL)\b[\*`]*"
+    r"\s+[—-]\s+(?:lead|portfolio lead)\s*:\s*(?P<lead>[^.\n]+)",
+    re.IGNORECASE,
+)
 ANALYSIS_MARKER = re.compile(r"\b(?:verdict|decision|score)\s*:", re.IGNORECASE)
 SEMANTIC_ANALYSIS_MARKERS = (
     "evidence ledger",
@@ -101,8 +112,8 @@ def validate_cases(case_dir):
     return sorted(cases, key=lambda case: case["id"])
 
 
-def _decision_table(text):
-    """Return decision cells and table offset from Markdown candidate table, or None."""
+def _candidate_table(text):
+    """Return structured candidate rows and table offset, or None."""
     lines = text.splitlines()
     offset = 0
     for index, line in enumerate(lines[:-1]):
@@ -110,23 +121,55 @@ def _decision_table(text):
             offset += len(line) + 1
             continue
         header = [cell.strip().lower() for cell in line.strip().strip("|").split("|")]
-        if "decision" not in header:
+        name_header = next((name for name in ("candidate", "opportunity") if name in header), None)
+        if name_header is None or "adjusted score" not in header or "decision" not in header:
             offset += len(line) + 1
             continue
         divider = [cell.strip() for cell in lines[index + 1].strip().strip("|").split("|")]
         if len(divider) != len(header) or not all(re.fullmatch(r":?-{3,}:?", cell) for cell in divider):
             offset += len(line) + 1
             continue
-        decision_index = header.index("decision")
-        values = []
+        rows = []
         for row in lines[index + 2 :]:
             if "|" not in row:
                 break
             cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
             if len(cells) != len(header):
                 break
-            values.append(cells[decision_index])
-        return values, offset
+            rows.append(
+                {
+                    "name": cells[header.index(name_header)],
+                    "score": cells[header.index("adjusted score")],
+                    "decision": cells[header.index("decision")],
+                }
+            )
+        return rows, offset
+    return None
+
+
+def _expected_decision(score):
+    if score >= 90:
+        return "GO"
+    if score >= 70:
+        return "TEST"
+    if score >= 50:
+        return "WATCH"
+    return "KILL"
+
+
+def _parse_score(value):
+    match = re.fullmatch(r"\s*[\*`]*(100|[1-9]?\d)\s*/\s*100[\*`]*\s*", value)
+    return int(match.group(1)) if match else None
+
+
+def _plain_name(value):
+    return " ".join(re.sub(r"[\*`_]", "", value).strip().lower().split())
+
+
+def _score_decision_failure(score, decision, subject):
+    expected = _expected_decision(score)
+    if decision != expected:
+        return f"{subject} adjusted score {score}/100 maps to {expected}, not {decision}"
     return None
 
 
@@ -147,25 +190,51 @@ def score_response(case, text):
             failures.append("response decision is not allowed for this case")
         elif case["mode"] == "validation" and len(matches) != 1:
             failures.append("response must state exactly one labeled decision")
+        elif case["mode"] == "validation":
+            scores = list(ADJUSTED_SCORE.finditer(text))
+            if len(scores) != 1:
+                failures.append("validation response must state exactly one adjusted score")
+            else:
+                failure = _score_decision_failure(
+                    int(scores[0].group("score")), decisions[0], "validation verdict"
+                )
+                if failure:
+                    failures.append(failure)
         elif case["mode"] in {"discovery", "portfolio"}:
             headings = list(CANDIDATE_HEADING.finditer(text))
-            table = _decision_table(text)
-            table_values = table[0] if table is not None else None
+            table = _candidate_table(text)
+            table_rows = table[0] if table is not None else None
             verdicts = [match for match in matches if match.group("label").lower() == "verdict"]
+            lead_match = LEAD_VERDICT.match(text)
             if len(verdicts) != 1:
                 failures.append("response must state exactly one overall verdict")
             elif matches[0] is not verdicts[0]:
                 failures.append("overall verdict must be the first labeled decision")
+            if lead_match is None:
+                failures.append("overall verdict must name one explicit lead candidate")
+            lead_name = _plain_name(lead_match.group("lead")) if lead_match else None
+            lead_decision = lead_match.group("decision").upper() if lead_match else None
+            candidates = []
             if headings:
-                if table_values is not None:
+                if table_rows is not None:
                     failures.append("response must use either candidate headings or a candidate decision table")
                 candidate_match_ranges = []
                 for index, heading in enumerate(headings):
                     end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
                     candidate_matches = list(DECISION_LABEL.finditer(text, heading.end(), end))
+                    candidate_scores = list(ADJUSTED_SCORE.finditer(text, heading.end(), end))
                     candidate_match_ranges.extend((match.start(), match.end()) for match in candidate_matches)
                     if len(candidate_matches) != 1:
                         failures.append("each candidate must state exactly one labeled decision")
+                    if len(candidate_scores) != 1:
+                        failures.append("each candidate must state exactly one adjusted score")
+                    if len(candidate_matches) == 1 and len(candidate_scores) == 1:
+                        decision = candidate_matches[0].group("decision").upper()
+                        score = int(candidate_scores[0].group("score"))
+                        candidates.append((_plain_name(heading.group("name")), decision))
+                        failure = _score_decision_failure(score, decision, f"candidate {heading.group('name')}")
+                        if failure:
+                            failures.append(failure)
                 for match in matches:
                     in_candidate = any(start <= match.start() < end for start, end in candidate_match_ranges)
                     if match.group("label").lower() == "decision" and not in_candidate:
@@ -173,23 +242,37 @@ def score_response(case, text):
                         break
                 if verdicts and verdicts[0].start() >= headings[0].start():
                     failures.append("candidate sections must not contain a Verdict label")
-            elif table_values is not None:
+            elif table_rows is not None:
                 if verdicts and verdicts[0].start() >= table[1]:
                     failures.append("overall verdict must appear before the candidate decision table")
-                if not table_values:
+                if not table_rows:
                     failures.append("candidate decision table must contain at least one candidate row")
-                for value in table_values:
-                    decision = re.fullmatch(r"\s*[\*`]*(GO|TEST|WATCH|KILL)[\*`]*\s*", value, re.IGNORECASE)
+                for row in table_rows:
+                    decision = re.fullmatch(r"\s*[\*`]*(GO|TEST|WATCH|KILL)[\*`]*\s*", row["decision"], re.IGNORECASE)
                     if not decision:
                         failures.append("each candidate decision table row must contain exactly one decision")
-                        break
-                    if decision.group(1).upper() not in case["allowed_decisions"]:
+                        continue
+                    decision_value = decision.group(1).upper()
+                    if decision_value not in case["allowed_decisions"]:
                         failures.append("response decision is not allowed for this case")
-                        break
+                    score = _parse_score(row["score"])
+                    if score is None:
+                        failures.append("each candidate decision table row must contain one adjusted score out of 100")
+                        continue
+                    candidates.append((_plain_name(row["name"]), decision_value))
+                    failure = _score_decision_failure(score, decision_value, f"candidate {row['name']}")
+                    if failure:
+                        failures.append(failure)
                 if any(match.group("label").lower() == "decision" for match in matches):
                     failures.append("candidate decisions must use the decision table cells")
-            elif len(matches) != 1 or matches[0].group("label").lower() != "verdict":
-                failures.append("unstructured discovery or portfolio responses may state only one overall verdict")
+            else:
+                failures.append("discovery or portfolio response must use candidate headings or a candidate table")
+            if lead_name is not None:
+                lead_candidates = [decision for name, decision in candidates if name == lead_name]
+                if len(lead_candidates) != 1:
+                    failures.append("named lead must identify exactly one candidate")
+                elif lead_candidates[0] != lead_decision:
+                    failures.append("overall verdict must equal the named lead candidate decision")
     for group in case["required_behavior_groups"]:
         if not any(phrase.lower() in normalized for phrase in group):
             failures.append(f"missing required behavior group: {' | '.join(group)}")

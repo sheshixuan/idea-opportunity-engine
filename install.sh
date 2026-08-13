@@ -100,12 +100,17 @@ stage_and_install() {
     exit "$exit_code"
   }
   interrupted() {
-    if [ "$backup_moved" -eq 1 ]; then
+    trap - HUP INT TERM
+    if [ "$backup_moved" -eq 1 ] && [ -e "${backup_skill:-}" ]; then
       preserve_recovery
-      trap - EXIT HUP INT TERM
       exit 128
     fi
-    trap - HUP INT TERM
+    if [ -e "$skill_dest" ]; then
+      echo "Update interrupted before backup; existing install remains at: $skill_dest" >&2
+      exit 128
+    fi
+    keep_stage=1
+    echo "Update interrupted during backup movement; staging retained for inspection at: $stage_dir" >&2
     exit 128
   }
   trap cleanup EXIT
