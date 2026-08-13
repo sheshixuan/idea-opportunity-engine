@@ -60,12 +60,27 @@ Use $idea-opportunity-engine to compare these opportunities: a returns-automatio
 For a standalone skill installed with `$skill-installer`, remove its installed `idea-opportunity-engine` skill directory and run the install command again. For a cloned checkout, update the checkout and replace only the nested skill directory:
 
 ```bash
-git pull --ff-only
-skill_root="${CODEX_HOME:-$HOME/.codex}/skills"
-skill_dest="$skill_root/idea-opportunity-engine"
-test -d "$skill_dest" || { echo "No installed skill at $skill_dest" >&2; exit 1; }
-rm -rf "$skill_dest"
-cp -R skills/idea-opportunity-engine "$skill_dest"
+git pull --ff-only && (
+  skill_root="${CODEX_HOME:-$HOME/.codex}/skills"
+  skill_dest="$skill_root/idea-opportunity-engine"
+  test -d "$skill_dest" || { echo "No installed skill at $skill_dest" >&2; exit 1; }
+  stage_dir="$(mktemp -d "$skill_root/.idea-opportunity-engine-update.XXXXXX")" || exit 1
+  cleanup() {
+    exit_code=$?
+    if [ -d "$stage_dir/previous" ] && [ ! -e "$skill_dest" ]; then
+      mv "$stage_dir/previous" "$skill_dest" || true
+    fi
+    rm -rf "$stage_dir"
+    trap - EXIT HUP INT TERM
+    exit "$exit_code"
+  }
+  trap cleanup EXIT HUP INT TERM
+  cp -R skills/idea-opportunity-engine "$stage_dir/idea-opportunity-engine"
+  test -f "$stage_dir/idea-opportunity-engine/SKILL.md" || { echo "Staged skill is incomplete" >&2; exit 1; }
+  mv "$skill_dest" "$stage_dir/previous"
+  mv "$stage_dir/idea-opportunity-engine" "$skill_dest"
+  rm -rf "$stage_dir/previous"
+)
 ```
 
 To uninstall the plugin, remove or disable it through the Codex plugin marketplace. To uninstall a cloned-checkout installation, remove only the exact nested skill destination:
