@@ -105,6 +105,16 @@ class EvalHarnessTests(unittest.TestCase):
         )
         self.assertTrue(score_response(case, response)["passed"])
 
+    def test_validation_accepts_inline_code_decision(self):
+        """A clearly labeled decision must not fail only because Markdown renders it as code."""
+        case = validate_cases(CASES)[0]
+        response = (
+            "Verdict: `KILL` the broad idea. Evidence, contradiction, and unknowns are explicit. "
+            "Alternatives include doing nothing. Willingness to pay is unproven. "
+            "Score: 10/100. Experiment has a failure threshold."
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
     def test_discovery_accepts_one_valid_decision_per_candidate(self):
         """Rejecting multi-candidate discovery or losing candidate decisions must fail this contract."""
         case = validate_cases(CASES)[1]
@@ -150,6 +160,27 @@ class EvalHarnessTests(unittest.TestCase):
             "Experiment: test a paid offer.\n"
             "| Opportunity | Decision |\n| --- | --- |\n"
             "| remediation audit | TEST |\n| training service | WATCH |"
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
+    def test_discovery_accepts_inline_code_decisions_in_table(self):
+        """Markdown code styling around exact decision cells must preserve their meaning."""
+        case = validate_cases(CASES)[1]
+        response = (
+            "Verdict: `TEST` the accessibility lead. Target user: small ecommerce teams. "
+            "Accessibility is the market change. Alternatives and willingness to pay are unknown. "
+            "Experiment: test a paid offer.\n"
+            "| Opportunity | Decision |\n| --- | --- |\n"
+            "| remediation audit | `TEST` |\n| training service | `WATCH` |"
+        )
+        self.assertTrue(score_response(case, response)["passed"])
+
+    def test_common_unicode_hyphen_preserves_constraint_match(self):
+        """Typography must not hide an otherwise explicit 30-day constraint from scoring."""
+        case = validate_cases(CASES)[5]
+        response = (
+            "Verdict: TEST the lead. A two-person team can run a 30‑day experiment within a $2,000 budget. "
+            "The cost is capped and the success threshold is two deposits."
         )
         self.assertTrue(score_response(case, response)["passed"])
 
@@ -264,7 +295,7 @@ class EvalHarnessTests(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertTrue(any("must not trigger" in failure for failure in result["failures"]))
 
-        boundary_response = "Go ahead and run this SQL query; it is outside the opportunity-analysis boundary."
+        boundary_response = "SELECT plan_tier, COUNT(DISTINCT user_id) FROM events GROUP BY plan_tier;"
         self.assertTrue(score_response(case, boundary_response)["passed"])
 
     def test_sql_boundary_rejects_unlabeled_analysis_with_boundary_language(self):

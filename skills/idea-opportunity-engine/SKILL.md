@@ -17,12 +17,13 @@ Produce a decision aid, not encouragement. Do not claim certainty where the evid
 
 ## Required response standard
 
-- Lead with a one-line verdict. Validation has one overall decision label; Discovery and Portfolio name one lead or portfolio recommendation and give each candidate exactly one decision label.
+- Lead with exactly `Verdict: GO`, `Verdict: TEST`, `Verdict: WATCH`, or `Verdict: KILL`, followed by the rationale on that line. Validation must not add another labeled `Verdict:` or `Decision:` elsewhere. Discovery and Portfolio use that one lead verdict, then give each candidate exactly one decision in a Markdown table `Decision` cell or under a `Candidate` heading as `Decision: GO|TEST|WATCH|KILL`.
 - Separate observed evidence, interpretation, contradiction, and unknown. Never present a hypothesis, market-size estimate, or AI popularity as proof of demand.
 - Name alternatives before recommending a solution; include non-software and status-quo alternatives when relevant.
 - Treat willingness to pay as unproven unless there is a credible payment or commitment signal.
 - Show the 100-point score, applicable penalties, confidence, and the decision mapping.
 - End with one thresholded experiment. Be willing to recommend `KILL` when the evidence or economics do not justify further work.
+- Preserve explicit user constraints in recognizable wording, including time box, team size, and budget, so the recommendation is auditable against the request.
 
 ## Boundaries
 

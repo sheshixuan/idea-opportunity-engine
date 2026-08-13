@@ -12,7 +12,7 @@ DECISIONS = {"GO", "TEST", "WATCH", "KILL"}
 MODES = {"discovery", "validation", "portfolio", "boundary"}
 CASE_ID = re.compile(r"^\d{3}$")
 DECISION_LABEL = re.compile(
-    r"\b(?P<label>verdict|decision)(?:\*\*)?\s*:\s*\**\s*(?P<decision>GO|TEST|WATCH|KILL)\b",
+    r"\b(?P<label>verdict|decision)(?:\*\*)?\s*:\s*[\*`]*\s*(?P<decision>GO|TEST|WATCH|KILL)\b",
     re.IGNORECASE,
 )
 CANDIDATE_HEADING = re.compile(r"(?im)^\s*#{1,6}\s+candidate\b.*$")
@@ -132,7 +132,7 @@ def _decision_table(text):
 
 def score_response(case, text):
     """Score only observable response rules; semantic quality still needs a human/LLM judge."""
-    normalized = text.lower()
+    normalized = text.lower().translate(str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-"}))
     failures = []
     if not case["should_trigger"]:
         semantic_marker_count = sum(marker in normalized for marker in SEMANTIC_ANALYSIS_MARKERS)
@@ -179,7 +179,7 @@ def score_response(case, text):
                 if not table_values:
                     failures.append("candidate decision table must contain at least one candidate row")
                 for value in table_values:
-                    decision = re.fullmatch(r"\s*(GO|TEST|WATCH|KILL)\s*", value, re.IGNORECASE)
+                    decision = re.fullmatch(r"\s*[\*`]*(GO|TEST|WATCH|KILL)[\*`]*\s*", value, re.IGNORECASE)
                     if not decision:
                         failures.append("each candidate decision table row must contain exactly one decision")
                         break
