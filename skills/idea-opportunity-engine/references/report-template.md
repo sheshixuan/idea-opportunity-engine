@@ -1,10 +1,10 @@
 # Report Shapes
 
-Use one shape. Start with the verdict and exactly one decision label: `GO`, `TEST`, `WATCH`, or `KILL`.
+Use one shape and start with the verdict. **Validation** has one overall decision label: `GO`, `TEST`, `WATCH`, or `KILL`. **Discovery** and **Portfolio** name one lead or portfolio recommendation, then assign exactly one of those decision labels to every evaluated candidate.
 
 ## Discovery
 
-1. **Verdict:** one sentence naming the top opportunity and decision.
+1. **Verdict:** one sentence naming the lead opportunity or recommendation; the table assigns exactly one decision to each candidate.
 2. **Opportunity table:** target user, observed friction or market change, job to be done, evidence strength, alternatives, willingness-to-pay signal, adjusted score, confidence, and decision for each candidate.
 3. **Recommended opportunity:** target user, problem, why now, evidence, contradictions, unknowns, and why it outranks alternatives.
 4. **Decisive experiment:** use the experiment contract.
@@ -19,7 +19,7 @@ Use one shape. Start with the verdict and exactly one decision label: `GO`, `TES
 
 ## Portfolio
 
-1. **Verdict:** one sentence naming the priority order and decision for the leading option.
+1. **Verdict:** one sentence naming the portfolio recommendation and priority order; the comparison assigns exactly one decision to each candidate.
 2. **Comparison table:** opportunity, target user, score by dimension, penalties, adjusted score, confidence, payment evidence, key risk, and decision.
 3. **Trade-offs:** explain why the leader wins and what evidence would change the ranking.
 4. **Next experiment:** specify the cheapest test for the leading unresolved risk; state whether the other options should be watched or killed.

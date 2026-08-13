@@ -25,15 +25,19 @@ The skill becomes available on the next Codex turn.
 
 ### Install from a cloned checkout
 
-Clone the repository, then use the included installer:
+After this repository is public, clone it and copy only the nested skill into your Codex skills directory:
 
 ```bash
 git clone https://github.com/sheshixuan/idea-opportunity-engine.git
 cd idea-opportunity-engine
-./install.sh
+skill_root="${CODEX_HOME:-$HOME/.codex}/skills"
+skill_dest="$skill_root/idea-opportunity-engine"
+test ! -e "$skill_dest" || { echo "Refusing to overwrite $skill_dest" >&2; exit 1; }
+mkdir -p "$skill_root"
+cp -R skills/idea-opportunity-engine "$skill_dest"
 ```
 
-`install.sh` is added in the next repository task. Until then, copy `skills/idea-opportunity-engine` into your Codex skills directory manually.
+This procedure copies only `skills/idea-opportunity-engine`; it does not install the repository root. A convenience `install.sh` is planned for the full release, but is not part of this package revision.
 
 ## Use
 
@@ -53,9 +57,26 @@ Use $idea-opportunity-engine to compare these opportunities: a returns-automatio
 
 ## Update and uninstall
 
-For a standalone skill installed with `$skill-installer`, remove its installed `idea-opportunity-engine` skill directory and run the install command again. For a cloned checkout, use `./install.sh --update` after the installer is available.
+For a standalone skill installed with `$skill-installer`, remove its installed `idea-opportunity-engine` skill directory and run the install command again. For a cloned checkout, update the checkout and replace only the nested skill directory:
 
-To uninstall the plugin, remove or disable it through the Codex plugin marketplace. To uninstall a cloned-checkout installation, use `./install.sh --uninstall` after the installer is available.
+```bash
+git pull --ff-only
+skill_root="${CODEX_HOME:-$HOME/.codex}/skills"
+skill_dest="$skill_root/idea-opportunity-engine"
+test -d "$skill_dest" || { echo "No installed skill at $skill_dest" >&2; exit 1; }
+rm -rf "$skill_dest"
+cp -R skills/idea-opportunity-engine "$skill_dest"
+```
+
+To uninstall the plugin, remove or disable it through the Codex plugin marketplace. To uninstall a cloned-checkout installation, remove only the exact nested skill destination:
+
+```bash
+skill_dest="${CODEX_HOME:-$HOME/.codex}/skills/idea-opportunity-engine"
+case "$skill_dest" in
+  */skills/idea-opportunity-engine) rm -rf "$skill_dest" ;;
+  *) echo "Refusing unexpected destination: $skill_dest" >&2; exit 1 ;;
+esac
+```
 
 ## Testing
 
